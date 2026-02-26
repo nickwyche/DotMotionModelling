@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Response bias modelling</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="site_libs/kePrint-0.0.1/kePrint.js"></script>
+
+<link href="site_libs/lightable-0.0.1/lightable.css" rel="stylesheet">
+
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-search-results"></div>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Response bias modelling</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>After Friday’s meeting I had a think about how we might model response bias in the dot motion task. At the moment there are a few problems with our analytic approach:</p>
+<ul>
+<li><p>It’s a compromise. We either exclude a lot of the data (restricting range to ±90° for ANOVA) or end up with an artificial metric that’s quite difficult to interpret (Rangelov et al.&nbsp;regression approach)</p></li>
+<li><p>It’s tough to answer questions about how responses are <em>distributed</em>, as opposed to simply looking at their means. As discussed, this is important if we want to assess whether people are guessing more on low-reward trials.</p></li>
+<li><p>It doesn’t work very well for our minority trial types (catch trials with 60% coherence, and dual-colour trials which pit high-reward and low-reward dot clouds against each other). Data per participant is quite sparse for these trial types, so they’re less appropriate for a straightforward ANOVA technique where we take condition means per participant.</p></li>
+</ul>
+<p>I went back to the drawing board and realised that we can simply model circular responses directly in the R package <em>brms</em>. This solves all of our problems:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 23%">
+<col style="width: 76%">
+</colgroup>
+<tbody>
+<tr class="odd">
+<td><strong>Problem</strong></td>
+<td><strong><em>brms</em></strong> <strong>modelling solution</strong></td>
+</tr>
+<tr class="even">
+<td>Compromise (dropping data or using an artificial metric which isn’t directly interpretable)</td>
+<td>Uses all data while yielding a directly intepretable parameter (<em>mu</em>, which is essentially the distribution’s mean)</td>
+</tr>
+<tr class="odd">
+<td>No info about response <em>distribution</em></td>
+<td>Can also model effects of task condition and random effects by participant for distribution (<em>kappa</em>, concentration of responses)</td>
+</tr>
+<tr class="even">
+<td>Problems with sparse trial-level data for rare trial types</td>
+<td>Partial pooling: model participants as offsets from latent population parameters. Because the model automatically downweights noisy participants and ‘shrinks’ extreme individual estimates toward the group mean, we can extract a more reliable signal from sparse trials than we could with e.g.&nbsp;ANOVA.</td>
+</tr>
+</tbody>
+</table>
+<p>These models are based off the von Mises distribution (circular equivalent of the normal distribution), which is defined by two parameters:</p>
+<ul>
+<li><p><em>mu</em>: the location parameter (where the distribution peaks)</p></li>
+<li><p><em>kappa</em>: the concentration parameter (how tightly clustered the data are around the peak of the distribution; like an inverse of dispersion measures such as SD)</p></li>
+</ul>
+<p>I’ve fit two models to the data in <em>brms</em>, as follows:</p>
+<ul>
+<li><p>For <em>core</em> and <em>catch</em> trials (i.e., 3 x 2 structure: 20%/40%/60% coherence x low/high reward):</p>
+<ul>
+<li><p>response bias (mu) ~ reward * coherence + (reward * coherence | participant)</p></li>
+<li><p>kappa ~ reward * coherence + (reward * coherence | participant)</p></li>
+</ul></li>
+<li><p>For <em>dual-colour</em> trials (i.e., 1 x 2 structure: one high-reward and one low-reward dot cloud x 20%/40% coherence)</p>
+<ul>
+<li><p>response bias (mu) ~ coherence + (coherence | participant)</p></li>
+<li><p>kappa ~ coherence + (coherence | participant)</p></li>
+</ul></li>
+</ul>
+<section id="core-and-catch-trials-reanalysis" class="level2">
+<h2 class="anchored" data-anchor-id="core-and-catch-trials-reanalysis">Core and catch trials: reanalysis</h2>
+<p><em>Core</em> trials made up the majority (90%; 432/480 trials) of the task. They’re what we’ve discussed in meetings so far: participants saw an equal number of trials from each cell of our 2 x 2 design (2 reward levels: low, high; 2 coherence levels: 20%, 40%).</p>
+<p>C<em>atch</em> trials (those with coherence 60%) comprised 5% of the total number of trials in the experiment (24/480), with an equal number of catch trials in each block. There were an equal number of high-reward and low-reward catch trials. In theory, these trials are so easy that we shouldn’t be seeing any reward-related bias in responding.</p>
+<p>Because catch trials basically add another level of coherence to the core 2 x 2 design, they can be directly added into a combined model. One thing to keep in mind is that estimation will often be less precise for 60% coherence trials as the model is informed by less data from this trial type.</p>
+<section id="does-the-model-fit" class="level3">
+<h3 class="anchored" data-anchor-id="does-the-model-fit">Does the model fit?</h3>
+<p>Let’s first visually inspect how the model is fitting relative to the observed data.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-1-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Overall, model fit is looking fairly good. The key concern is that it’s slightly underestimating the heights of the distributions’ peaks, and for 40% coherence the ‘shoulders’ are a bit too wide. Both of these things suggest we should tweak priors for response precision, and/or fit a mixture model that accounts for guessing also. For now, this fit is near enough that I think we can take the following results as indicators of what we’d expect to see from a mixture modelling approach.</p>
+</section>
+<section id="is-a-response-bias-present" class="level3">
+<h3 class="anchored" data-anchor-id="is-a-response-bias-present">Is a response bias present?</h3>
+<p>First let’s see how the model has estimated <em>mu</em> (mean) in each reward x coherence condition.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<caption>Response bias by condition (degrees)</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Reward</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Coherence</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Bias</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Lower</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Upper</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">P(&gt;0)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">hi</td>
+<td style="text-align: center;">0.2</td>
+<td style="text-align: center;">4.36</td>
+<td style="text-align: center;">2.16</td>
+<td style="text-align: center;">6.51</td>
+<td style="text-align: center;">1.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">hi</td>
+<td style="text-align: center;">0.4</td>
+<td style="text-align: center;">2.06</td>
+<td style="text-align: center;">0.26</td>
+<td style="text-align: center;">3.83</td>
+<td style="text-align: center;">0.99</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">hi</td>
+<td style="text-align: center;">0.6</td>
+<td style="text-align: center;">1.61</td>
+<td style="text-align: center;">-0.52</td>
+<td style="text-align: center;">3.62</td>
+<td style="text-align: center;">0.93</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lo</td>
+<td style="text-align: center;">0.2</td>
+<td style="text-align: center;">1.50</td>
+<td style="text-align: center;">-0.65</td>
+<td style="text-align: center;">3.64</td>
+<td style="text-align: center;">0.91</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">lo</td>
+<td style="text-align: center;">0.4</td>
+<td style="text-align: center;">2.64</td>
+<td style="text-align: center;">0.91</td>
+<td style="text-align: center;">4.37</td>
+<td style="text-align: center;">1.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lo</td>
+<td style="text-align: center;">0.6</td>
+<td style="text-align: center;">3.03</td>
+<td style="text-align: center;">0.74</td>
+<td style="text-align: center;">5.29</td>
+<td style="text-align: center;">1.00</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Takeaways:</p>
+<ul>
+<li><p>When coherence is low (20%), there is a credible response bias for high-value trials but not low-value ones</p></li>
+<li><p>When coherence is medium (40%), there is a credible (but small) response bias for both high and low-value trials.</p></li>
+<li><p>When coherence is high (60%), there is no longer a response bias for high-value trials. Conversely, the response bias for low-value trials persists.</p></li>
+</ul>
+</section>
+<section id="how-does-bias-change-with-coherence-and-reward" class="level3">
+<h3 class="anchored" data-anchor-id="how-does-bias-change-with-coherence-and-reward">How does bias change with coherence and reward?</h3>
+<p>The nice thing about this modelling approach is that we can see the posterior distribution for the size of changes to response bias across levels of coherence and reward (i.e., the range of plausible values for how much the response has actually shifted). In these graphs, the plotted point is the median difference and the whiskers are the 66% (thick) and 95% (thin) credible intervals.</p>
+<section id="effect-of-coherence" class="level4">
+<h4 class="anchored" data-anchor-id="effect-of-coherence">Effect of coherence</h4>
+<p>Firstly, let’s take a look at how coherence affects response bias within each level of reward.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-3-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<caption>Change in bias across coherence levels</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Reward Level</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Diff</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Lower 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Upper 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">P(Diff)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">hi coherence0.2 - hi coherence0.4</td>
+<td style="text-align: center;">2.30</td>
+<td style="text-align: center;">0.68</td>
+<td style="text-align: center;">3.89</td>
+<td style="text-align: center;">1.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">hi coherence0.2 - hi coherence0.6</td>
+<td style="text-align: center;">2.76</td>
+<td style="text-align: center;">0.81</td>
+<td style="text-align: center;">4.70</td>
+<td style="text-align: center;">1.00</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">hi coherence0.4 - hi coherence0.6</td>
+<td style="text-align: center;">0.46</td>
+<td style="text-align: center;">-1.06</td>
+<td style="text-align: center;">1.99</td>
+<td style="text-align: center;">0.73</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lo coherence0.2 - lo coherence0.4</td>
+<td style="text-align: center;">-1.14</td>
+<td style="text-align: center;">-2.81</td>
+<td style="text-align: center;">0.51</td>
+<td style="text-align: center;">0.91</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">lo coherence0.2 - lo coherence0.6</td>
+<td style="text-align: center;">-1.53</td>
+<td style="text-align: center;">-3.67</td>
+<td style="text-align: center;">0.63</td>
+<td style="text-align: center;">0.92</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lo coherence0.4 - lo coherence0.6</td>
+<td style="text-align: center;">-0.40</td>
+<td style="text-align: center;">-2.15</td>
+<td style="text-align: center;">1.40</td>
+<td style="text-align: center;">0.67</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>Takeaways:</p>
+<ul>
+<li><p>For low-reward trials, the bias is stable: it doesn’t reliably change across any of the coherence comparisons</p></li>
+<li><p>For high-reward trials, the exceptional condition is low coherence: bias in this condition is credibly higher than in either the medium or high coherence condition. Note that the bias doesn’t credibly differ across the two higher-coherence conditions.</p></li>
+</ul>
+</section>
+<section id="effect-of-reward" class="level4">
+<h4 class="anchored" data-anchor-id="effect-of-reward">Effect of reward</h4>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-4-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<caption>Core trials: change in bias across reward levels</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Coherence Level</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Diff</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Lower 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Upper 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">P(Diff)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">hi coherence0.6 - lo coherence0.6</td>
+<td style="text-align: center;">-1.43</td>
+<td style="text-align: center;">-3.46</td>
+<td style="text-align: center;">0.61</td>
+<td style="text-align: center;">0.92</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">hi coherence0.4 - lo coherence0.4</td>
+<td style="text-align: center;">-0.57</td>
+<td style="text-align: center;">-1.70</td>
+<td style="text-align: center;">0.53</td>
+<td style="text-align: center;">0.85</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">hi coherence0.2 - lo coherence0.2</td>
+<td style="text-align: center;">2.86</td>
+<td style="text-align: center;">0.78</td>
+<td style="text-align: center;">4.95</td>
+<td style="text-align: center;">1.00</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>Takeaways:</p>
+<ul>
+<li><p>When coherence is low, response bias is credibly larger for high-reward trials than low-reward ones</p></li>
+<li><p>When coherence is medium and high, there is no credible difference in response bias based on reward level, but the trend suggests the bias may be inverting (i.e., crossover interaction: as coherence increases, participants show more bias on low-value trials than high-value ones)</p></li>
+</ul>
+</section>
+</section>
+<section id="does-response-precision-change-across-trial-types" class="level3">
+<h3 class="anchored" data-anchor-id="does-response-precision-change-across-trial-types">Does response precision change across trial types?</h3>
+<p>Next, let’s see how the model has estimated <em>kappa</em> (response precision) in each reward x coherence condition.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<caption>Core trials: response precision (kappa) by condition</caption>
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="3" data-quarto-table-cell-role="th" style="text-align: left; empty-cells: hide; border-bottom: hidden;"></th>
+<th colspan="2" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+95% Credible Interval
+</div></th>
+</tr>
+<tr class="odd">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Coherence</th>
+<th style="text-align: left;" data-quarto-table-cell-role="th">Reward</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Kappa</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Lower</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Upper</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" style="text-align: left; vertical-align: top !important;">0.2</td>
+<td style="text-align: left;">hi</td>
+<td style="text-align: center;">0.599</td>
+<td style="text-align: center;">0.483</td>
+<td style="text-align: center;">0.742</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lo</td>
+<td style="text-align: center;">0.597</td>
+<td style="text-align: center;">0.486</td>
+<td style="text-align: center;">0.737</td>
+</tr>
+<tr class="odd">
+<td rowspan="2" style="text-align: left; vertical-align: top !important;">0.4</td>
+<td style="text-align: left;">hi</td>
+<td style="text-align: center;">1.491</td>
+<td style="text-align: center;">1.204</td>
+<td style="text-align: center;">1.853</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lo</td>
+<td style="text-align: center;">1.370</td>
+<td style="text-align: center;">1.115</td>
+<td style="text-align: center;">1.684</td>
+</tr>
+<tr class="odd">
+<td rowspan="2" style="text-align: left; vertical-align: top !important;">0.6</td>
+<td style="text-align: left;">hi</td>
+<td style="text-align: center;">2.677</td>
+<td style="text-align: center;">1.983</td>
+<td style="text-align: center;">3.598</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">lo</td>
+<td style="text-align: center;">2.166</td>
+<td style="text-align: center;">1.578</td>
+<td style="text-align: center;">2.973</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>I won’t do the full set of pairwise contrasts here as we don’t care about most of them. As expected, there’s a clear effect of coherence upon kappa (high-coherence trials produce a less dispersed distribution of responses).</p>
+<p>Note also that the model has found it harder to estimate precision for the catch (60% coherence) trials. This may be due to the lower amount of data available, but looking at the posteriors for 40% coherence trials, it could also be due to identifiability issues when estimating <em>kappa</em> for tighter distributions (i.e., once a distribution is already ‘spiked,’ even massive increases in <em>kappa</em> result in almost no visible change to the response spread).</p>
+<p>However, a key question remains: within each level of coherence, is responding less precise for low-reward trials? In other words, are people making less of an effort when they aren’t going to win big?</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<caption>Response precision (kappa) differences: high vs. low reward</caption>
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="2" data-quarto-table-cell-role="th" style="text-align: left; empty-cells: hide; border-bottom: hidden;"></th>
+<th colspan="2" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+95% Credible Interval
+</div></th>
+<th data-quarto-table-cell-role="th" style="text-align: center; empty-cells: hide; border-bottom: hidden;"></th>
+</tr>
+<tr class="odd">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Coherence</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Diff</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Lower 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Upper 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">P(hi &gt; lo)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">0.2</td>
+<td style="text-align: center;">0.002</td>
+<td style="text-align: center;">-0.062</td>
+<td style="text-align: center;">0.066</td>
+<td style="text-align: center;">0.527</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">0.4</td>
+<td style="text-align: center;">0.123</td>
+<td style="text-align: center;">0.000</td>
+<td style="text-align: center;">0.256</td>
+<td style="text-align: center;">0.975</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">0.6</td>
+<td style="text-align: center;">0.504</td>
+<td style="text-align: center;">0.029</td>
+<td style="text-align: center;">1.024</td>
+<td style="text-align: center;">0.981</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>So yes: while there’s no difference in response precision for low-coherence trials, it does appear that people are trying less hard for low-reward trials when coherence is higher.</p>
+</section>
+<section id="random-effects" class="level3">
+<h3 class="anchored" data-anchor-id="random-effects">Random effects</h3>
+<p>It’s also worth checking the random intercepts for <em>mu</em> (mean) from the model. While these aren’t random <em>slopes</em> (i.e., they don’t vary by task condition), they do give an indicator of individual propensity to demonstrate response bias on this task. Combined with the random intercepts for <em>kappa</em> (response precision), we can do a quick visual check: should we be concerned that the biases we’re seeing are driven by individuals whose responses are more imprecise?</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-7-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In this graph, we see ‘baseline bias’: the model intercept for bias with each participant’s offset added. Overall, if anything, it looks like people who are <em>poor</em> responders tend to have baseline biases close to 0, which is consistent with the idea that they’re guessing more.</p>
+</section>
+</section>
+<section id="dual-colour-trials-new-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="dual-colour-trials-new-analysis">Dual-colour trials: new analysis</h2>
+<p>Finally, let’s analyse the <em>dual-colour</em> trials (those where participants saw one high-reward and one low-reward patch). These trials comprised 5% of the experiment (24/480) but only appeared in the second half of blocks, by which time participants should have been well-versed in the colour-reward contingencies for the task. Participants didn’t get score feedback for this trial type until the end of the experiment, when they learnt their cumulative score for these trials. There were an equal number of high-coherence and low-coherence dual-colour trials.</p>
+<section id="is-a-response-bias-present-1" class="level3">
+<h3 class="anchored" data-anchor-id="is-a-response-bias-present-1">Is a response bias present?</h3>
+<p>When we talk about a <em>response bias</em> for dual-colour trials, I mean that the participant’s response was biased towards the high-reward motion direction rather the low-reward one. First let’s see how the model has estimated <em>mu</em> (mean) in each coherence condition.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<caption>Dual-colour trials: bias vs. 0 (degrees)</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Coherence</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Bias</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Lower</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Upper</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">P(&gt;0)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">0.2</td>
+<td style="text-align: center;">2.31</td>
+<td style="text-align: center;">-1.73</td>
+<td style="text-align: center;">6.48</td>
+<td style="text-align: center;">0.87</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">0.4</td>
+<td style="text-align: center;">0.65</td>
+<td style="text-align: center;">-1.22</td>
+<td style="text-align: center;">2.60</td>
+<td style="text-align: center;">0.75</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>Neither mean differs credibly from 0. It seems plausible that if we had more data, we might see a reward bias when coherence is low, but the posterior distribution is pretty wide because there are so few datapoints and performance under low coherence is inherently more noisy.</p>
+</section>
+<section id="how-does-response-bias-change-across-coherence-levels" class="level3">
+<h3 class="anchored" data-anchor-id="how-does-response-bias-change-across-coherence-levels">How does response bias change across coherence levels?</h3>
+<p>Although it seems unlikely that a credible change will be detected given how wide the posterior distribution for low-coherence trials is, let’s check anyway.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="2" data-quarto-table-cell-role="th" style="text-align: left; empty-cells: hide; border-bottom: hidden;"></th>
+<th colspan="2" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+95% Credible Interval
+</div></th>
+<th data-quarto-table-cell-role="th" style="text-align: center; empty-cells: hide; border-bottom: hidden;"></th>
+</tr>
+<tr class="odd">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Contrast</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Diff</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Lower 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Upper 95%</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">P(Direction)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">High - low coherence</td>
+<td style="text-align: center;">-1.63</td>
+<td style="text-align: center;">-6.11</td>
+<td style="text-align: center;">2.68</td>
+<td style="text-align: center;">0.76</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+<p>As expected, we don’t have evidence of a credible difference in response bias across coherence levels here.</p>
+</section>
+<section id="does-response-precision-change" class="level3">
+<h3 class="anchored" data-anchor-id="does-response-precision-change">Does response precision change?</h3>
+<p><em>Kappa</em> (response precision) for dual-colour trials is not so interesting, as the only factor being varied is coherence. As expected, response precision is much higher for high-coherence trials than low-coherence ones.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="responsebias_circularmodel_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th colspan="2" data-quarto-table-cell-role="th" style="text-align: left; empty-cells: hide; border-bottom: hidden;"></th>
+<th colspan="2" data-quarto-table-cell-role="th" style="text-align: center; border-bottom: hidden; padding-bottom: 0; padding-left: 3px; padding-right: 3px;"><div style="border-bottom: 1px solid #ddd; padding-bottom: 5px; ">
+95% Credible Interval
+</div></th>
+</tr>
+<tr class="odd">
+<th style="text-align: left;" data-quarto-table-cell-role="th">Coherence</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">Median Kappa</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Lower</th>
+<th style="text-align: center;" data-quarto-table-cell-role="th">95% Upper</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">0.2</td>
+<td style="text-align: center;">0.552</td>
+<td style="text-align: center;">0.389</td>
+<td style="text-align: center;">0.757</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">0.4</td>
+<td style="text-align: center;">1.750</td>
+<td style="text-align: center;">1.308</td>
+<td style="text-align: center;">2.290</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
