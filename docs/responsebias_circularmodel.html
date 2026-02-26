@@ -73,14 +73,35 @@ ul.task-list li input[type="checkbox"] {
 
 </head>
 
-<body class="fullcontent">
+<body>
 
 <div id="quarto-search-results"></div>
 <!-- content -->
 <div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active" data-toc-expanded="99">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#core-and-catch-trials-reanalysis" id="toc-core-and-catch-trials-reanalysis" class="nav-link active" data-scroll-target="#core-and-catch-trials-reanalysis"><span class="header-section-number">1</span> Core and catch trials: reanalysis</a>
+  <ul class="collapse">
+  <li><a href="#does-the-model-fit" id="toc-does-the-model-fit" class="nav-link" data-scroll-target="#does-the-model-fit"><span class="header-section-number">1.1</span> Does the model fit?</a></li>
+  <li><a href="#is-a-response-bias-present" id="toc-is-a-response-bias-present" class="nav-link" data-scroll-target="#is-a-response-bias-present"><span class="header-section-number">1.2</span> Is a response bias present?</a></li>
+  <li><a href="#how-does-bias-change-with-coherence-and-reward" id="toc-how-does-bias-change-with-coherence-and-reward" class="nav-link" data-scroll-target="#how-does-bias-change-with-coherence-and-reward"><span class="header-section-number">1.3</span> How does bias change with coherence and reward?</a></li>
+  <li><a href="#does-response-precision-change-across-trial-types" id="toc-does-response-precision-change-across-trial-types" class="nav-link" data-scroll-target="#does-response-precision-change-across-trial-types"><span class="header-section-number">1.4</span> Does response precision change across trial types?</a></li>
+  <li><a href="#random-effects" id="toc-random-effects" class="nav-link" data-scroll-target="#random-effects"><span class="header-section-number">1.5</span> Random effects</a></li>
+  </ul></li>
+  <li><a href="#dual-colour-trials-new-analysis" id="toc-dual-colour-trials-new-analysis" class="nav-link" data-scroll-target="#dual-colour-trials-new-analysis"><span class="header-section-number">2</span> Dual-colour trials: new analysis</a>
+  <ul class="collapse">
+  <li><a href="#is-a-response-bias-present-1" id="toc-is-a-response-bias-present-1" class="nav-link" data-scroll-target="#is-a-response-bias-present-1"><span class="header-section-number">2.1</span> Is a response bias present?</a></li>
+  <li><a href="#how-does-response-bias-change-across-coherence-levels" id="toc-how-does-response-bias-change-across-coherence-levels" class="nav-link" data-scroll-target="#how-does-response-bias-change-across-coherence-levels"><span class="header-section-number">2.2</span> How does response bias change across coherence levels?</a></li>
+  <li><a href="#does-response-precision-change" id="toc-does-response-precision-change" class="nav-link" data-scroll-target="#does-response-precision-change"><span class="header-section-number">2.3</span> Does response precision change?</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
 <!-- main -->
 <main class="content" id="quarto-document-content">
 
@@ -152,13 +173,13 @@ ul.task-list li input[type="checkbox"] {
 <li><p>kappa ~ coherence + (coherence | participant)</p></li>
 </ul></li>
 </ul>
-<section id="core-and-catch-trials-reanalysis" class="level2">
-<h2 class="anchored" data-anchor-id="core-and-catch-trials-reanalysis">Core and catch trials: reanalysis</h2>
+<section id="core-and-catch-trials-reanalysis" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="core-and-catch-trials-reanalysis"><span class="header-section-number">1</span> Core and catch trials: reanalysis</h2>
 <p><em>Core</em> trials made up the majority (90%; 432/480 trials) of the task. They’re what we’ve discussed in meetings so far: participants saw an equal number of trials from each cell of our 2 x 2 design (2 reward levels: low, high; 2 coherence levels: 20%, 40%).</p>
 <p>C<em>atch</em> trials (those with coherence 60%) comprised 5% of the total number of trials in the experiment (24/480), with an equal number of catch trials in each block. There were an equal number of high-reward and low-reward catch trials. In theory, these trials are so easy that we shouldn’t be seeing any reward-related bias in responding.</p>
 <p>Because catch trials basically add another level of coherence to the core 2 x 2 design, they can be directly added into a combined model. One thing to keep in mind is that estimation will often be less precise for 60% coherence trials as the model is informed by less data from this trial type.</p>
-<section id="does-the-model-fit" class="level3">
-<h3 class="anchored" data-anchor-id="does-the-model-fit">Does the model fit?</h3>
+<section id="does-the-model-fit" class="level3" data-number="1.1">
+<h3 data-number="1.1" class="anchored" data-anchor-id="does-the-model-fit"><span class="header-section-number">1.1</span> Does the model fit?</h3>
 <p>Let’s first visually inspect how the model is fitting relative to the observed data.</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -171,8 +192,8 @@ ul.task-list li input[type="checkbox"] {
 </div>
 <p>Overall, model fit is looking fairly good. The key concern is that it’s slightly underestimating the heights of the distributions’ peaks, and for 40% coherence the ‘shoulders’ are a bit too wide. Both of these things suggest we should tweak priors for response precision, and/or fit a mixture model that accounts for guessing also. For now, this fit is near enough that I think we can take the following results as indicators of what we’d expect to see from a mixture modelling approach.</p>
 </section>
-<section id="is-a-response-bias-present" class="level3">
-<h3 class="anchored" data-anchor-id="is-a-response-bias-present">Is a response bias present?</h3>
+<section id="is-a-response-bias-present" class="level3" data-number="1.2">
+<h3 data-number="1.2" class="anchored" data-anchor-id="is-a-response-bias-present"><span class="header-section-number">1.2</span> Is a response bias present?</h3>
 <p>First let’s see how the model has estimated <em>mu</em> (mean) in each reward x coherence condition.</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -257,11 +278,11 @@ ul.task-list li input[type="checkbox"] {
 <li><p>When coherence is high (60%), there is no longer a response bias for high-value trials. Conversely, the response bias for low-value trials persists.</p></li>
 </ul>
 </section>
-<section id="how-does-bias-change-with-coherence-and-reward" class="level3">
-<h3 class="anchored" data-anchor-id="how-does-bias-change-with-coherence-and-reward">How does bias change with coherence and reward?</h3>
+<section id="how-does-bias-change-with-coherence-and-reward" class="level3" data-number="1.3">
+<h3 data-number="1.3" class="anchored" data-anchor-id="how-does-bias-change-with-coherence-and-reward"><span class="header-section-number">1.3</span> How does bias change with coherence and reward?</h3>
 <p>The nice thing about this modelling approach is that we can see the posterior distribution for the size of changes to response bias across levels of coherence and reward (i.e., the range of plausible values for how much the response has actually shifted). In these graphs, the plotted point is the median difference and the whiskers are the 66% (thick) and 95% (thin) credible intervals.</p>
-<section id="effect-of-coherence" class="level4">
-<h4 class="anchored" data-anchor-id="effect-of-coherence">Effect of coherence</h4>
+<section id="effect-of-coherence" class="level4" data-number="1.3.1">
+<h4 data-number="1.3.1" class="anchored" data-anchor-id="effect-of-coherence"><span class="header-section-number">1.3.1</span> Effect of coherence</h4>
 <p>Firstly, let’s take a look at how coherence affects response bias within each level of reward.</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -338,8 +359,8 @@ ul.task-list li input[type="checkbox"] {
 <li><p>For high-reward trials, the exceptional condition is low coherence: bias in this condition is credibly higher than in either the medium or high coherence condition. Note that the bias doesn’t credibly differ across the two higher-coherence conditions.</p></li>
 </ul>
 </section>
-<section id="effect-of-reward" class="level4">
-<h4 class="anchored" data-anchor-id="effect-of-reward">Effect of reward</h4>
+<section id="effect-of-reward" class="level4" data-number="1.3.2">
+<h4 data-number="1.3.2" class="anchored" data-anchor-id="effect-of-reward"><span class="header-section-number">1.3.2</span> Effect of reward</h4>
 <div class="cell">
 <div class="cell-output-display">
 <div>
@@ -395,8 +416,8 @@ ul.task-list li input[type="checkbox"] {
 </ul>
 </section>
 </section>
-<section id="does-response-precision-change-across-trial-types" class="level3">
-<h3 class="anchored" data-anchor-id="does-response-precision-change-across-trial-types">Does response precision change across trial types?</h3>
+<section id="does-response-precision-change-across-trial-types" class="level3" data-number="1.4">
+<h3 data-number="1.4" class="anchored" data-anchor-id="does-response-precision-change-across-trial-types"><span class="header-section-number">1.4</span> Does response precision change across trial types?</h3>
 <p>Next, let’s see how the model has estimated <em>kappa</em> (response precision) in each reward x coherence condition.</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -544,8 +565,8 @@ ul.task-list li input[type="checkbox"] {
 </div>
 <p>So yes: while there’s no difference in response precision for low-coherence trials, it does appear that people are trying less hard for low-reward trials when coherence is higher.</p>
 </section>
-<section id="random-effects" class="level3">
-<h3 class="anchored" data-anchor-id="random-effects">Random effects</h3>
+<section id="random-effects" class="level3" data-number="1.5">
+<h3 data-number="1.5" class="anchored" data-anchor-id="random-effects"><span class="header-section-number">1.5</span> Random effects</h3>
 <p>It’s also worth checking the random intercepts for <em>mu</em> (mean) from the model. While these aren’t random <em>slopes</em> (i.e., they don’t vary by task condition), they do give an indicator of individual propensity to demonstrate response bias on this task. Combined with the random intercepts for <em>kappa</em> (response precision), we can do a quick visual check: should we be concerned that the biases we’re seeing are driven by individuals whose responses are more imprecise?</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -559,11 +580,11 @@ ul.task-list li input[type="checkbox"] {
 <p>In this graph, we see ‘baseline bias’: the model intercept for bias with each participant’s offset added. Overall, if anything, it looks like people who are <em>poor</em> responders tend to have baseline biases close to 0, which is consistent with the idea that they’re guessing more.</p>
 </section>
 </section>
-<section id="dual-colour-trials-new-analysis" class="level2">
-<h2 class="anchored" data-anchor-id="dual-colour-trials-new-analysis">Dual-colour trials: new analysis</h2>
+<section id="dual-colour-trials-new-analysis" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="dual-colour-trials-new-analysis"><span class="header-section-number">2</span> Dual-colour trials: new analysis</h2>
 <p>Finally, let’s analyse the <em>dual-colour</em> trials (those where participants saw one high-reward and one low-reward patch). These trials comprised 5% of the experiment (24/480) but only appeared in the second half of blocks, by which time participants should have been well-versed in the colour-reward contingencies for the task. Participants didn’t get score feedback for this trial type until the end of the experiment, when they learnt their cumulative score for these trials. There were an equal number of high-coherence and low-coherence dual-colour trials.</p>
-<section id="is-a-response-bias-present-1" class="level3">
-<h3 class="anchored" data-anchor-id="is-a-response-bias-present-1">Is a response bias present?</h3>
+<section id="is-a-response-bias-present-1" class="level3" data-number="2.1">
+<h3 data-number="2.1" class="anchored" data-anchor-id="is-a-response-bias-present-1"><span class="header-section-number">2.1</span> Is a response bias present?</h3>
 <p>When we talk about a <em>response bias</em> for dual-colour trials, I mean that the participant’s response was biased towards the high-reward motion direction rather the low-reward one. First let’s see how the model has estimated <em>mu</em> (mean) in each coherence condition.</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -608,8 +629,8 @@ ul.task-list li input[type="checkbox"] {
 </div>
 <p>Neither mean differs credibly from 0. It seems plausible that if we had more data, we might see a reward bias when coherence is low, but the posterior distribution is pretty wide because there are so few datapoints and performance under low coherence is inherently more noisy.</p>
 </section>
-<section id="how-does-response-bias-change-across-coherence-levels" class="level3">
-<h3 class="anchored" data-anchor-id="how-does-response-bias-change-across-coherence-levels">How does response bias change across coherence levels?</h3>
+<section id="how-does-response-bias-change-across-coherence-levels" class="level3" data-number="2.2">
+<h3 data-number="2.2" class="anchored" data-anchor-id="how-does-response-bias-change-across-coherence-levels"><span class="header-section-number">2.2</span> How does response bias change across coherence levels?</h3>
 <p>Although it seems unlikely that a credible change will be detected given how wide the posterior distribution for low-coherence trials is, let’s check anyway.</p>
 <div class="cell">
 <div class="cell-output-display">
@@ -660,8 +681,8 @@ ul.task-list li input[type="checkbox"] {
 </div>
 <p>As expected, we don’t have evidence of a credible difference in response bias across coherence levels here.</p>
 </section>
-<section id="does-response-precision-change" class="level3">
-<h3 class="anchored" data-anchor-id="does-response-precision-change">Does response precision change?</h3>
+<section id="does-response-precision-change" class="level3" data-number="2.3">
+<h3 data-number="2.3" class="anchored" data-anchor-id="does-response-precision-change"><span class="header-section-number">2.3</span> Does response precision change?</h3>
 <p><em>Kappa</em> (response precision) for dual-colour trials is not so interesting, as the only factor being varied is coherence. As expected, response precision is much higher for high-coherence trials than low-coherence ones.</p>
 <div class="cell">
 <div class="cell-output-display">
