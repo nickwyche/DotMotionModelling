@@ -1,0 +1,692 @@
+---
+title: "Response bias modelling"
+format: html
+editor: visual
+html:
+    toc: true
+    toc-location: right
+    toc-expand: true
+    code-fold: true
+    mathjax: true
+
+project:
+  type: website
+  output-dir: docs
+
+execute:
+  freeze: auto
+---
+
+## Mixture modelling on core trials
+
+*Core* trials made up the majority (90%; 432/480 trials) of the task. They're what we've discussed in meetings so far: participants saw an equal number of trials from each cell of our 2 x 2 design (2 reward levels: low, high; 2 coherence levels: 20%, 40%).
+
+Writeup to come. Note: accidentally didn't exclude guessers, but in a way this is good as model still fits well (would just assign them a high guessing probability).
+
+### Does the model fit?
+
+First, let's visually inspect how the model is fitting relative to the observed data.
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+pacman::p_load(brms, emmeans, bayestestR,	tidybayes, dplyr, ggplot2, bayesplot, ggh4x, knitr, kableExtra)
+
+df=read.csv("exptrialdata_merged.csv")
+
+df$coherence=as.factor(df$coherence)
+df$trialval=as.factor(df$trialval)
+
+df$valuebias_rad = (df$valuebias*pi/180)
+df$colourangle_rad = (df$colourangle*pi/180)
+df$greyangle_rad = (df$greyangle*pi/180)
+df$response_rad = (df$response*pi/180)
+df$id_orig = df$id
+df$id = as.numeric(factor(df$pnum))
+
+df$block = as.factor(ceiling(df$trialnum/60))
+
+core = filter(df, trialtype=="core" & soft_timeout_flag == 0)
+combo = filter(df, trialtype!="comp" & soft_timeout_flag == 0)
+
+##### Filtering participants #####
+
+trial_exclusions <- core %>%
+  count(id) %>%
+  mutate(droprate = 1-(n / 432))
+
+exclusion_drops <- trial_exclusions %>%
+  filter(droprate > 0.2) %>%
+  pull(id)
+
+rayleigh_results <- core %>%
+  group_by(id) %>%
+  summarise(
+    n = n(),
+    rayleigh_p = tryCatch({
+      rayleigh.test(circular(valuebias_rad))$p.value
+    }, error = function(e) NA),
+    rayleigh_stat = tryCatch({
+      rayleigh.test(circular(valuebias_rad))$statistic
+    }, error = function(e) NA),
+    .groups = "drop"
+  )
+
+rayleigh_drops <- rayleigh_results %>%
+  filter(rayleigh_p > 0.05) %>%
+  pull(id)
+
+drops <- union(exclusion_drops, rayleigh_drops)
+
+combo_filt <- combo %>%
+  filter(!(id %in% drops)) %>%
+  mutate(
+    trialval = droplevels(as.factor(trialval)),
+    coherence = droplevels(as.factor(coherence))
+    )
+
+# 3. Generate y_rep
+
+core_filt <- core %>%
+  filter(!(id %in% c(26))) %>%
+  mutate(
+    trialval = droplevels(as.factor(trialval)),
+    coherence = droplevels(as.factor(coherence))
+    )
+
+fit_combo_dist <- readRDS("fit_combo_dist_3x2.rds")
+fit_mixture_test <- readRDS("dotmotion_mixmodel.rds")
+
+valid_ids <- rownames(ranef(fit_combo_dist)$id)
+
+# 2. Filter the data to match the model's knowledge
+# This ensures y_obs and y_rep are the same length and refer to the same people
+combo_filt_clean <- combo_filt %>%
+  mutate(id = as.character(id)) %>%
+  filter(id %in% valid_ids) %>%
+  mutate(
+    trialval = droplevels(as.factor(trialval)),
+    coherence = droplevels(as.factor(coherence)),
+    condition = interaction(trialval, coherence, sep = " | Coh: ")
+  )
+
+
+y_rep_mix <- posterior_predict(fit_mixture_test, ndraws = 10)
+y_obs <- core_filt$valuebias_rad
+
+# 2. Create the interaction for paneling
+core_filt$condition <- interaction(core_filt$trialval, 
+                                   core_filt$coherence, 
+                                   sep = " | Coh: ")
+
+# 3. Grouped PPC plot
+library(bayesplot)
+
+ppc_dens_overlay_grouped(
+  y = y_obs * 180/pi, 
+  yrep = y_rep_mix * 180/pi, 
+  group = core_filt$condition
+) + 
+  theme_minimal() +
+  labs(
+    title = "Mixture Model PPC by Condition",
+    subtitle = "Dark line = Data | Light lines = Mixture of Von Mises + Uniform simulations",
+    x = "Value bias (degrees)",
+    y = "Density"
+  ) +
+  facet_wrap(~ group, ncol = 2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.5)
+
+```
+
+Overall, model fit is looking much better than for the simpler non-mixture version (circular response distribution with dispersion.
+
+```{r}
+
+
+y_rep <- posterior_predict(
+  fit_combo_dist, 
+  newdata = combo_filt_clean,
+  ndraws = 10
+)
+
+# 4. Get the observed values from the clean dataset
+y_obs <- combo_filt_clean$valuebias_rad
+
+# 5. Plot
+ppc_dens_overlay_grouped(
+  y = y_obs * 180 / pi, 
+  yrep = y_rep * 180 / pi, 
+  group = combo_filt_clean$condition
+) + 
+  theme_minimal() +
+  labs(
+    title = "Posterior Predictive Check by Condition",
+    subtitle = "Comparing observed data to model simulations (Valid Participants Only)",
+    x = "Value Bias (degrees)",
+    y = "Density"
+  ) +
+  facet_wrap(~ group, ncol = 2) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.5)
+
+```
+
+### Is a response bias present?
+
+First let's see how the model has estimated *mu* (mean) in each reward x coherence condition.
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+cell_draws_mix <- emmeans(fit_mixture_test, ~ trialval * coherence, dpar = "mu1") %>%
+  gather_emmeans_draws()
+
+# 2. Test vs. 0: Is the task-directed bias credible?
+zero_test_summary_mix <- cell_draws_mix %>%
+  group_by(trialval, coherence) %>%
+  summarize(
+    # Calculations in radians first
+    median_rad = median(.value),
+    lower_rad  = quantile(.value, 0.025),
+    upper_rad  = quantile(.value, 0.975),
+    # p_direction returns the probability that the effect is strictly >0 or <0
+    pd = as.numeric(p_direction(.value)),
+    .groups = "drop"
+  ) %>%
+  # Convert to degrees for human readability
+  mutate(
+    median_deg = round(median_rad * 180 / pi, 2),
+    lower_95_deg = round(lower_rad * 180 / pi, 2),
+    upper_95_deg = round(upper_rad * 180 / pi, 2),
+    pd = round(pd, 3)
+  )
+
+# 3. Create the Kable Table
+
+# 4. Visualization
+ggplot(zero_test_summary_mix, aes(x = trialval, y = median_deg, color = trialval)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", alpha = 0.6) +
+  geom_pointrange(aes(ymin = lower_95_deg, ymax = upper_95_deg), 
+                  size = 1, linewidth = 1.2) +
+  facet_wrap(~ coherence, labeller = label_both) +
+  scale_color_manual(values = c("hi" = "#ff6117", "lo" = "#009dff")) +
+  labs(
+    title = "Clean Reward Bias (Mixture Model Component: mu1)",
+    subtitle = "Noise-filtered bias estimates | Error bars: 95% CIs",
+    x = "Trial Reward",
+    y = "Bias (Degrees)",
+    color = "Reward Level"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"))
+
+zero_test_summary_mix %>%
+  select(trialval, coherence, median_deg, lower_95_deg, upper_95_deg, pd) %>%
+  knitr::kable(
+    caption = "Task-Directed Bias (mu1) by Condition (Degrees)",
+    col.names = c("Reward", "Coherence", "Median Bias", "95% Lower", "95% Upper", "P-Direction"),
+    align = "lccccc"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+```
+
+Takeaways:
+
+-   When coherence is *low* (20%), there is a credible response bias for high-value trials but not low-value ones
+
+-   When coherence is *medium* (40%), there is a credible (but small) response bias for both high and low-value trials.
+
+-   When coherence is *high* (60%), there is no longer a response bias for high-value trials. Conversely, the response bias for low-value trials persists.
+
+### How does bias change with coherence and reward?
+
+The nice thing about this modelling approach is that we can see the posterior distributions for *differences* in response bias across levels of coherence and reward (i.e., the range of plausible values for how much the response has actually shifted). In these graphs, the plotted point is the median difference and the whiskers are the 66% (thick) and 95% (thin) credible intervals.
+
+#### Effect of coherence
+
+Firstly, let's take a look at how coherence affects response bias within each level of reward.
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+all_draws_mix <- emmeans(fit_mixture_test, pairwise ~ trialval * coherence, dpar = "mu1")$contrasts %>%
+  gather_emmeans_draws()
+
+# 2. Define the relevant coherence contrasts (0.2 vs 0.4)
+# Note: emmeans usually formats these as "hi 0.2 - hi 0.4"
+ordered_levels_mix <- c(
+  "hi 0.2 - hi 0.4",
+  "lo 0.2 - lo 0.4"
+)
+
+coherence_effects_mix <- all_draws_mix %>%
+  filter(
+    # Matches "hi ... - hi ..."
+    (grepl("hi", contrast) & !grepl("lo", contrast)) | 
+      # Matches "lo ... - lo ..."
+      (grepl("lo", contrast) & !grepl("hi", contrast))
+  ) %>%
+  # Now that we only have within-reward rows, check the coherence
+  filter(grepl("0.2", contrast) & grepl("0.4", contrast)) %>%
+  mutate(
+    reward_group = ifelse(grepl("hi", contrast), "High Reward", "Low Reward"),
+    diff_deg = .value * 180 / pi
+  )
+
+# 2. This should now be 4000 and 4000 (or whatever your ndraws is)
+print(table(coherence_effects_mix$reward_group))
+
+# 3. Plot
+ggplot(coherence_effects_mix, aes(x = diff_deg, y = reward_group, fill = reward_group)) +
+  stat_halfeye(alpha = 0.8) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
+  scale_fill_manual(values = c("High Reward" = "#ff6117", "Low Reward" = "#009dff")) +
+  labs(
+    title = "Corrected: Coherence Effect within Reward Levels",
+    subtitle = "Comparing Bias at 0.2 vs 0.4 Coherence",
+    x = "Bias Difference (Degrees)",
+    y = ""
+  ) +
+  theme_minimal()
+
+# 5. Summary Table
+coherence_diff_summary_mix <- coherence_effects_mix %>%
+  group_by(contrast) %>%
+  summarize(
+    median = median(diff_deg),
+    lower_95 = quantile(diff_deg, 0.025),
+    upper_95 = quantile(diff_deg, 0.975),
+    pd = as.numeric(bayestestR::p_direction(.value)),
+    .groups = "drop"
+  ) %>%
+  arrange(match(contrast, ordered_levels_mix)) 
+
+coherence_diff_summary_mix %>%
+  mutate(across(where(is.numeric), ~ round(., 3))) %>%
+  knitr::kable(
+    format = "html",
+    caption = "Mixture Model: Change in task-directed bias (mu1) across coherence",
+    col.names = c("Condition Contrast", "Median Diff", "Lower 95%", "Upper 95%", "P-Direction"),
+    align = "lcccc"
+  ) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+```
+
+Takeaways:
+
+#### Effect of reward
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+draws_clean <- emmeans(fit_mixture_test, pairwise ~ trialval * coherence, dpar = "mu1")$contrasts %>%
+  gather_emmeans_draws() %>%
+  mutate(diff_deg = .value * 180 / pi)
+
+# 2. Filter specifically for Reward Effects (Hi - Lo) within Coherence levels
+reward_effect_clean <- draws_clean %>%
+  filter(
+    # Rule A: Must compare Hi to Lo
+    (grepl("hi", contrast) & grepl("lo", contrast)) & 
+      # Rule B: Must happen within 0.2 OR within 0.4
+      (grepl("0.2", contrast) | grepl("0.4", contrast)) &
+      # Rule C: BAN mixing coherence levels (0.2 vs 0.4)
+      !(grepl("0.2", contrast) & grepl("0.4", contrast))
+  ) %>%
+  mutate(
+    # Create nice labels for the plot
+    coherence_level = ifelse(grepl("0.2", contrast), "Low Coherence (0.2)", "High Coherence (0.4)"),
+    coherence_level = factor(coherence_level, levels = c("High Coherence (0.4)", "Low Coherence (0.2)"))
+  )
+
+# 3. Plot with the consistent Y-axis
+ggplot(reward_effect_clean, aes(x = diff_deg, y = coherence_level, fill = coherence_level)) +
+  stat_halfeye(alpha = 0.8) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
+  scale_fill_manual(values = c("Low Coherence (0.2)" = "#807dba", "High Coherence (0.4)" = "#bcbddc")) +
+  labs(
+    title = "Reward Effect on Task-Directed Bias (mu1)",
+    subtitle = "Posterior of (High Reward - Low Reward) | Positive = Increased Bias",
+    x = "Difference in Bias (Degrees)",
+    y = ""
+  ) +
+  theme_minimal(base_size = 14) +
+  guides(fill = "none")
+
+# Summary Table for the Task-Directed Bias Shift (mu1)
+reward_diff_summary_mix <- reward_effect_clean %>%
+  group_by(coherence_level) %>%
+  summarize(
+    median = median(diff_deg),
+    lower_95 = quantile(diff_deg, 0.025),
+    upper_95 = quantile(diff_deg, 0.975),
+    # p_direction (pd) represents the certainty of the effect direction
+    pd = as.numeric(bayestestR::p_direction(.value)),
+    .groups = "drop"
+  ) %>%
+  # Ensures 0.2 (Low Coherence) stays at the top of the table
+  arrange(desc(coherence_level))
+
+# Render the HTML Table
+reward_diff_summary_mix %>%
+  mutate(across(where(is.numeric), ~ round(., 2))) %>%
+  knitr::kable(
+    format = "html",
+    caption = "<b>Mixture Model: Reward-Induced Bias Shift (mu1)</b><br>Values represent High Reward minus Low Reward in degrees.",
+    col.names = c("Coherence Level", "Median Diff", "95% Lower", "95% Upper", "P-Direction"),
+    align = "lcccc"
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"), 
+    full_width = FALSE,
+    position = "left"
+  )
+```
+
+Takeaways:
+
+-   
+
+### Does response precision change across trial types?
+
+Next, let's see how the model has estimated *kappa* (response precision) in each reward x coherence condition.
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+ordered_coherence <- c("0.2", "0.4") 
+
+# 2. Extract draws for the task-directed precision parameter (kappa1)
+precision_estimates_mix <- emmeans(fit_mixture_test, ~ trialval * coherence, dpar = "kappa1") %>%
+  gather_emmeans_draws() %>%
+  mutate(
+    # emmeans/brms returns kappa on the log scale for mixture models
+    actual_kappa = exp(.value), 
+    coherence = factor(coherence, levels = ordered_coherence),
+    trialval = factor(trialval, levels = c("hi", "lo"))
+  )
+
+# 3. The Mirrored Plot
+ggplot(precision_estimates_mix, aes(x = actual_kappa, y = coherence, fill = trialval)) +
+  stat_halfeye(
+    # Mirrored layout: Hi on top, Lo on bottom
+    aes(side = ifelse(trialval == "hi", "top", "bottom")),
+    scale = 0.7,
+    alpha = 0.8,
+    point_interval = median_qi,
+    position = position_dodge(width = 0.3) 
+  ) +
+  scale_fill_manual(
+    values = c("hi" = "#ff6117", "lo" = "#009dff"),
+    labels = c("hi" = "High reward", "lo" = "Low reward")
+  ) +
+  scale_y_discrete(labels = c(
+    "0.2" = "Low (0.2)", 
+    "0.4" = "High (0.4)"
+  )) +
+  labs(
+    title = "Mixture Model: Task-Directed Precision (Kappa1)",
+    subtitle = "Higher values indicate more precise (sharper) responses",
+    x = "Concentration parameter (kappa1)",
+    y = "Coherence",
+    fill = "Reward"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    panel.grid.major.y = element_line(color = "grey95"),
+    axis.text.y = element_text(face = "bold")
+  )
+
+# 4. Summary Table
+precision_summary_mix <- precision_estimates_mix %>%
+  group_by(coherence, trialval) %>%
+  summarize(
+    median_kappa = median(actual_kappa),
+    lower_95 = quantile(actual_kappa, 0.025),
+    upper_95 = quantile(actual_kappa, 0.975),
+    .groups = "drop"
+  ) %>%
+  arrange(coherence, desc(trialval))
+
+# 5. Render Styled Table
+precision_summary_mix %>%
+  mutate(across(where(is.numeric), ~ round(., 3))) %>%
+  knitr::kable(
+    format = "html",
+    caption = "Task-directed precision (kappa1) by condition",
+    col.names = c("Coherence", "Reward", "Median Kappa", "95% Lower", "95% Upper"),
+    align = "llccc"
+  ) %>%
+  kableExtra::kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"), 
+    full_width = FALSE
+  ) %>%
+  kableExtra::collapse_rows(columns = 1, valign = "top") %>%
+  kableExtra::add_header_above(c(" " = 3, "95% Credible Interval" = 2))
+
+
+```
+
+I won't do the full set of pairwise contrasts here as we don't care about most of them. As expected, there's a clear effect of coherence upon kappa (high-coherence trials produce a less dispersed distribution of responses).
+
+Note also that the model has found it harder to estimate precision for the catch (60% coherence) trials. This may be due to the lower amount of data available, but looking at the posteriors for 40% coherence trials, it could also be due to identifiability issues when estimating *kappa* for tighter distributions (i.e., once a distribution is already 'spiked,' even massive increases in *kappa* result in almost no visible change to the response spread).
+
+However, a key question remains: within each level of coherence, is responding less precise for low-reward trials? In other words, are people making less of an effort when they aren't going to win big?
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+
+kappa_draws_mix <- emmeans(fit_mixture_test, ~ trialval * coherence, dpar = "kappa1") %>%
+  gather_emmeans_draws() %>%
+  mutate(
+    # mixture models in brms usually use a log link for kappa
+    actual_kappa = exp(.value) 
+  )
+
+# 1. Re-extract and ensure we group by coherence before comparing reward levels
+kappa_diffs_mix <- kappa_draws_mix %>%
+  group_by(coherence) %>% # CRITICAL: Ensure coherence is the grouping variable
+  compare_levels(actual_kappa, by = trialval, comparison = list(c("hi", "lo"))) %>%
+  ungroup()
+
+# 2. Re-run the plot (it should stay the same, but verify labels)
+ggplot(kappa_diffs_mix, aes(x = actual_kappa, y = coherence, fill = coherence)) +
+  stat_halfeye(.width = c(0.95, 0.66), point_interval = median_qi, alpha = 0.8) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  scale_fill_brewer(palette = "Oranges") +
+  scale_y_discrete(limits = c("0.4", "0.2")) + 
+  labs(title = "Reward Effect on Precision (kappa1)", x = "Difference in kappa (Hi - Lo)") +
+  theme_minimal()
+
+# 3. Re-run the summary table
+kappa_diff_summary_mix <- kappa_diffs_mix %>%
+  group_by(coherence) %>%
+  summarize(
+    median_diff = median(actual_kappa),
+    lower_95 = quantile(actual_kappa, 0.025),
+    upper_95 = quantile(actual_kappa, 0.975),
+    prob_hi_better = mean(actual_kappa > 0),
+    .groups = "drop" # Ensure groups are dropped for the kable
+  )
+
+# Check the table output now
+kappa_diff_summary_mix %>%
+  knitr::kable(digits = 3, format = "html") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+So yes: while there's no difference in response precision for low-coherence trials, it does appear that people are trying less hard for low-reward trials when coherence is higher.
+
+### Guessing proportion
+
+Do people guess less on easier trials?
+
+```{r}
+
+cell_guess_mix <- emmeans(fit_mixture_test, ~ trialval * coherence, dpar = "theta2") %>%
+  gather_emmeans_draws() %>%
+  mutate(prob_guess = plogis(.value)) # Transform to 0-1 probability scale
+
+# 2. Summary Table
+zero_test_guess_summary <- cell_guess_mix %>%
+  group_by(trialval, coherence) %>%
+  summarize(
+    median_prob = median(prob_guess),
+    lower_95 = quantile(prob_guess, 0.025),
+    upper_95 = quantile(prob_guess, 0.975),
+    pd = as.numeric(bayestestR::p_direction(prob_guess)),
+    .groups = "drop"
+  )
+
+# 3. Create the Kable Table
+zero_test_guess_summary %>%
+  mutate(across(where(is.numeric), ~ round(., 3))) %>%
+  knitr::kable(
+    caption = "Raw Guess Rate (theta2) by Condition (Probability)",
+    col.names = c("Reward", "Coherence", "Median Guess Rate", "95% Lower", "95% Upper", "P-Direction"),
+    align = "lccccc"
+  ) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+# 4. Visualization
+ggplot(zero_test_guess_summary, aes(x = trialval, y = median_prob, color = trialval)) +
+  geom_pointrange(aes(ymin = lower_95, ymax = upper_95), size = 1, linewidth = 1.2) +
+  facet_wrap(~ coherence, labeller = label_both) +
+  scale_color_manual(values = c("hi" = "#ff6117", "lo" = "#009dff")) +
+  labs(
+    title = "Guess Rate (theta2) by Condition",
+    subtitle = "Probability of random lapse | Error bars: 95% CIs",
+    x = "Trial Reward",
+    y = "Guess Probability (0-1)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+Effect of coherence on guess rates within each reward condition
+
+```{r}
+
+# 1. Get raw cell probabilities (theta2)
+cell_probs_guess <- emmeans(fit_mixture_test, ~ trialval * coherence, dpar = "theta2") %>%
+  gather_emmeans_draws() %>%
+  mutate(p = plogis(.value))
+
+# 2. Calculate the difference: (0.2 Coherence - 0.4 Coherence) within each Reward
+coherence_guess_effects <- cell_probs_guess %>%
+  group_by(trialval) %>%
+  compare_levels(p, by = coherence, comparison = list(c("0.2", "0.4"))) %>%
+  ungroup() %>%
+  mutate(reward_group = ifelse(trialval == "hi", "High Reward", "Low Reward"))
+
+# 3. Summary Table
+coherence_guess_summary <- coherence_guess_effects %>%
+  group_by(reward_group) %>%
+  summarize(
+    median_diff = median(p),
+    lower_95 = quantile(p, 0.025),
+    upper_95 = quantile(p, 0.975),
+    prob_increase = mean(p > 0), # Probability that harder task increased guessing
+    .groups = "drop"
+  )
+
+# Render Table
+coherence_guess_summary %>%
+  mutate(across(where(is.numeric), ~ round(., 4))) %>%
+  knitr::kable(
+    format = "html",
+    caption = "<b>Coherence Effect on Guess Rate (0.2 - 0.4)</b>",
+    col.names = c("Reward Level", "Median Diff", "Lower 95%", "Upper 95%", "P(Increase)"),
+    align = "lcccc"
+  ) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+# 4. Visualization
+ggplot(coherence_guess_effects, aes(x = p, y = reward_group, fill = reward_group)) +
+  stat_halfeye(alpha = 0.8, .width = c(0.66, 0.95)) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
+  scale_fill_manual(values = c("High Reward" = "#ff6117", "Low Reward" = "#009dff")) +
+  labs(
+    title = "Mixture Model: Coherence Effect on Guess Rate (theta2)",
+    subtitle = "Difference: (Guess Prob @ 0.2) - (Guess Prob @ 0.4)\nPositive values: Harder task led to more random guessing",
+    x = "Change in Guess Probability (Percentage Points)",
+    y = ""
+  ) +
+  theme_minimal(base_size = 14) +
+  guides(fill = "none")
+
+```
+
+Effect of reward on guess rates within each coherence level
+
+```{r}
+
+# 1. Get the Reward Effect (Hi - Lo) safely within each Coherence level
+reward_guess_effects <- cell_guess_mix %>%
+  group_by(coherence) %>%
+  compare_levels(prob_guess, by = trialval, comparison = list(c("hi", "lo"))) %>%
+  ungroup() %>%
+  mutate(
+    coherence_level = ifelse(grepl("0.2", coherence), "Low Coherence (0.2)", "High Coherence (0.4)"),
+    coherence_level = factor(coherence_level, levels = c("High Coherence (0.4)", "Low Coherence (0.2)"))
+  )
+
+# 2. Summary Table
+reward_guess_summary <- reward_guess_effects %>%
+  group_by(coherence_level) %>%
+  summarize(
+    median_diff = median(prob_guess),
+    lower_95 = quantile(prob_guess, 0.025),
+    upper_95 = quantile(prob_guess, 0.975),
+    prob_hi_lower = mean(prob_guess < 0), # Certainty that Hi Reward REDUCED guessing
+    .groups = "drop"
+  )
+
+# Render Table
+reward_guess_summary %>%
+  mutate(across(where(is.numeric), ~ round(., 4))) %>%
+  knitr::kable(
+    format = "html",
+    caption = "<b>Reward Effect on Guess Rate (Hi - Lo Probability)</b>",
+    col.names = c("Coherence Level", "Median Diff", "Lower 95%", "Upper 95%", "P(Hi < Lo)"),
+    align = "lcccc"
+  ) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+
+# 3. Visualization
+ggplot(reward_guess_effects, aes(x = prob_guess, y = coherence_level, fill = coherence_level)) +
+  stat_halfeye(alpha = 0.8) +
+  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
+  scale_fill_brewer(palette = "Greens") +
+  labs(
+    title = "Reward Effect on Guess Rate (theta2)",
+    subtitle = "Difference: (Prob High) - (Prob Low) | Negative values: Reward reduced lapses",
+    x = "Difference in Guess Probability (Percentage Points)",
+    y = ""
+  ) +
+  theme_minimal(base_size = 14) +
+  guides(fill = "none")
+
+```

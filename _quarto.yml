@@ -1,0 +1,19 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Dot Motion Modelling"
+  sidebar:
+    style: "floating"
+    contents:
+      - index.qmd
+      - responsebias_circularmodel.qmd
+      - responsebias_mixturemodel.qmd
+
+format:
+  html:
+    embed-resources: true
+    theme: cosmo
+    toc: true
+    code-fold: true

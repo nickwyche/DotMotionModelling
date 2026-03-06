@@ -1,0 +1,9 @@
+.quarto
+_files
+_cache
+.Rhistory
+.RData
+*.rds
+*.csv
+.Rproj.user
+/.quarto/
