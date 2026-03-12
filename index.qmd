@@ -8,3 +8,4 @@ for our dot motion project.
 ## Pages
 - [27/2: Circular modelling](responsebias_circularmodel.qmd)
 - [6/3: Mixture modelling](responsebias_mixturemodel.qmd)
+- [12/3: Strategy modelling](responsebias_mixturemodel_revised.qmd)
