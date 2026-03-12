@@ -4855,68 +4855,6 @@ vertical-align: -.125em;
 </ol>
 <p>In previous versions of our modelling, there were some indications that a handful of people are using Strategies 2 and 3. Let’s look at the raw data for each individual’s response bias, collapsed over conditions:</p>
 <div class="cell">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false      # Prevents the code itself from appearing in the document</span></span>
-<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| message: false   # Prevents package loading messages and brms/Stan progress</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">#| warning: false   # Prevents warning messages</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="co">#| error: false     # Prevents error messages from printing</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>pacman<span class="sc">::</span><span class="fu">p_load</span>(brms, emmeans, bayestestR,   tidybayes, dplyr, ggplot2, bayesplot, ggh4x, knitr, kableExtra, cmdstanr, tidyverse, patchwork)</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>df<span class="ot">=</span><span class="fu">read.csv</span>(<span class="st">&quot;exptrialdata_merged.csv&quot;</span>)</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>coherence<span class="ot">=</span><span class="fu">as.factor</span>(df<span class="sc">$</span>coherence)</span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>trialval<span class="ot">=</span><span class="fu">as.factor</span>(df<span class="sc">$</span>trialval)</span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>valuebias_rad <span class="ot">=</span> (df<span class="sc">$</span>valuebias<span class="sc">*</span>pi<span class="sc">/</span><span class="dv">180</span>)</span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>colourangle_rad <span class="ot">=</span> (df<span class="sc">$</span>colourangle<span class="sc">*</span>pi<span class="sc">/</span><span class="dv">180</span>)</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>greyangle_rad <span class="ot">=</span> (df<span class="sc">$</span>greyangle<span class="sc">*</span>pi<span class="sc">/</span><span class="dv">180</span>)</span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>response_rad <span class="ot">=</span> (df<span class="sc">$</span>response<span class="sc">*</span>pi<span class="sc">/</span><span class="dv">180</span>)</span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>id_orig <span class="ot">=</span> df<span class="sc">$</span>id</span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>id <span class="ot">=</span> <span class="fu">as.numeric</span>(<span class="fu">factor</span>(df<span class="sc">$</span>pnum))</span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>df<span class="sc">$</span>block <span class="ot">=</span> <span class="fu">as.factor</span>(<span class="fu">ceiling</span>(df<span class="sc">$</span>trialnum<span class="sc">/</span><span class="dv">60</span>))</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>core <span class="ot">=</span> <span class="fu">filter</span>(df, trialtype<span class="sc">==</span><span class="st">&quot;core&quot;</span> <span class="sc">&amp;</span> soft_timeout_flag <span class="sc">==</span> <span class="dv">0</span>)</span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>combo <span class="ot">=</span> <span class="fu">filter</span>(df, trialtype<span class="sc">!=</span><span class="st">&quot;comp&quot;</span> <span class="sc">&amp;</span> soft_timeout_flag <span class="sc">==</span> <span class="dv">0</span>)</span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>plot_data_id <span class="ot">&lt;-</span> combo <span class="sc">%&gt;%</span></span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(id) <span class="sc">%&gt;%</span></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_bias =</span> <span class="fu">mean</span>(valuebias_rad, <span class="at">na.rm =</span> <span class="cn">TRUE</span>),</span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    <span class="at">n =</span> <span class="fu">n</span>(),</span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    <span class="at">sd_bias =</span> <span class="fu">sd</span>(valuebias_rad, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    <span class="at">se =</span> sd_bias <span class="sc">/</span> <span class="fu">sqrt</span>(n),</span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    <span class="at">lower_95 =</span> mean_bias <span class="sc">-</span> <span class="fl">1.96</span> <span class="sc">*</span> se,</span>
-<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    <span class="at">upper_95 =</span> mean_bias <span class="sc">+</span> <span class="fl">1.96</span> <span class="sc">*</span> se,</span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">lower_66 =</span> mean_bias <span class="sc">-</span> <span class="fl">0.95</span> <span class="sc">*</span> se,</span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">upper_66 =</span> mean_bias <span class="sc">+</span> <span class="fl">0.95</span> <span class="sc">*</span> se,</span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>    <span class="at">is_biased =</span> <span class="fu">ifelse</span>(lower_95 <span class="sc">&gt;</span> <span class="dv">0</span> <span class="sc">|</span> upper_95 <span class="sc">&lt;</span> <span class="dv">0</span>, <span class="st">&quot;Significantly Biased&quot;</span>, <span class="st">&quot;Consistent with 0&quot;</span>)</span>
-<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">id =</span> <span class="fu">reorder</span>(<span class="fu">as.factor</span>(id), mean_bias))</span>
-<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(plot_data_id, <span class="fu">aes</span>(<span class="at">x =</span> id, <span class="at">y =</span> mean_bias)) <span class="sc">+</span></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbar</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> lower_95, <span class="at">ymax =</span> upper_95), <span class="at">width =</span> <span class="dv">0</span>, <span class="at">alpha =</span> <span class="fl">0.6</span>) <span class="sc">+</span></span>
-<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_linerange</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> lower_66, <span class="at">ymax =</span> upper_66), <span class="at">linewidth =</span> <span class="fl">1.2</span>) <span class="sc">+</span></span>
-<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="fl">1.8</span>) <span class="sc">+</span></span>
-<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>, <span class="at">color =</span> <span class="st">&quot;black&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.4</span>) <span class="sc">+</span></span>
-<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
-<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Participant Mean Response Bias&quot;</span>,</span>
-<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Color indicates 95% CI does not overlap with 0 (Perfect Averaging)&quot;</span>,</span>
-<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Participant ID (Ranked)&quot;</span>,</span>
-<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Mean Bias (radians)&quot;</span>,</span>
-<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>    <span class="at">color =</span> <span class="st">&quot;Classification&quot;</span></span>
-<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
-<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">&quot;bottom&quot;</span>,</span>
-<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">7</span>)</span>
-<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -4924,136 +4862,6 @@ vertical-align: -.125em;
 </figure>
 </div>
 </div>
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="do">##### 1. Build brms design objects #####</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># MODEL A</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>mix_formula <span class="ot">&lt;-</span> <span class="fu">bf</span>(</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  valuebias_rad <span class="sc">~</span> <span class="dv">1</span>, </span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  mu1    <span class="sc">~</span> trialval <span class="sc">*</span> coherence <span class="sc">+</span> (trialval <span class="sc">*</span> coherence <span class="sc">|</span> id),</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  kappa1 <span class="sc">~</span> trialval <span class="sc">*</span> coherence <span class="sc">+</span> (trialval <span class="sc">*</span> coherence <span class="sc">|</span> id),</span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  mu2    <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  kappa2 <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  theta2 <span class="sc">~</span> trialval <span class="sc">*</span> coherence <span class="sc">+</span> (trialval <span class="sc">*</span> coherence <span class="sc">|</span> id)</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>prior_mix <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(0, 0.5)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;mu1&quot;</span>),</span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(0, 0.5)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;b&quot;</span>,         <span class="at">dpar =</span> <span class="st">&quot;mu1&quot;</span>),</span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;exponential(5)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;sd&quot;</span>,        <span class="at">dpar =</span> <span class="st">&quot;mu1&quot;</span>),</span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(1, 1)&quot;</span>,   <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;kappa1&quot;</span>),</span>
-<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(0, 1)&quot;</span>,   <span class="at">class =</span> <span class="st">&quot;b&quot;</span>,         <span class="at">dpar =</span> <span class="st">&quot;kappa1&quot;</span>),</span>
-<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;exponential(5)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;sd&quot;</span>,        <span class="at">dpar =</span> <span class="st">&quot;kappa1&quot;</span>),</span>
-<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;constant(0)&quot;</span>,    <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;mu2&quot;</span>),</span>
-<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;constant(-100)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;kappa2&quot;</span>),</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(0, 1)&quot;</span>,   <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;theta2&quot;</span>),</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(0, 1)&quot;</span>,   <span class="at">class =</span> <span class="st">&quot;b&quot;</span>,         <span class="at">dpar =</span> <span class="st">&quot;theta2&quot;</span>),</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;exponential(5)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;sd&quot;</span>,        <span class="at">dpar =</span> <span class="st">&quot;theta2&quot;</span>),</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;lkj(2)&quot;</span>,         <span class="at">class =</span> <span class="st">&quot;cor&quot;</span>)</span>
-<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="co"># MODEL B</span></span>
-<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a>combo<span class="sc">$</span>dist_to_colour <span class="ot">&lt;-</span> <span class="fu">abs</span>(<span class="fu">atan2</span>(</span>
-<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">sin</span>(combo<span class="sc">$</span>colourangle_rad <span class="sc">-</span> combo<span class="sc">$</span>greyangle_rad),</span>
-<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cos</span>(combo<span class="sc">$</span>colourangle_rad <span class="sc">-</span> combo<span class="sc">$</span>greyangle_rad)</span>
-<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a>)) <span class="sc">/</span> <span class="dv">2</span></span>
-<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-34"><a href="#cb2-34" aria-hidden="true" tabindex="-1"></a>formula_B <span class="ot">&lt;-</span> <span class="fu">bf</span>(</span>
-<span id="cb2-35"><a href="#cb2-35" aria-hidden="true" tabindex="-1"></a>  valuebias_rad <span class="sc">~</span> <span class="dv">1</span>, </span>
-<span id="cb2-36"><a href="#cb2-36" aria-hidden="true" tabindex="-1"></a>  mu1    <span class="sc">~</span> <span class="dv">0</span> <span class="sc">+</span> dist_to_colour,</span>
-<span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a>  kappa1 <span class="sc">~</span> coherence <span class="sc">+</span> (coherence <span class="sc">|</span> id),</span>
-<span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a>  mu2    <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a>  kappa2 <span class="sc">~</span> <span class="dv">1</span>,</span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>  theta2 <span class="sc">~</span> coherence <span class="sc">+</span> (coherence <span class="sc">|</span> id)</span>
-<span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a>prior_B <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
-<span id="cb2-44"><a href="#cb2-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;constant(1)&quot;</span>,  <span class="at">class =</span> <span class="st">&quot;b&quot;</span>,         <span class="at">dpar =</span> <span class="st">&quot;mu1&quot;</span>),</span>
-<span id="cb2-45"><a href="#cb2-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(1, 1)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;kappa1&quot;</span>),</span>
-<span id="cb2-46"><a href="#cb2-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(0, 1)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;b&quot;</span>,         <span class="at">dpar =</span> <span class="st">&quot;kappa1&quot;</span>),</span>
-<span id="cb2-47"><a href="#cb2-47" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;constant(0)&quot;</span>,  <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;mu2&quot;</span>),</span>
-<span id="cb2-48"><a href="#cb2-48" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;constant(-100)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;kappa2&quot;</span>),</span>
-<span id="cb2-49"><a href="#cb2-49" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(-1, 1)&quot;</span>, <span class="at">class =</span> <span class="st">&quot;Intercept&quot;</span>, <span class="at">dpar =</span> <span class="st">&quot;theta2&quot;</span>),</span>
-<span id="cb2-50"><a href="#cb2-50" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_prior</span>(<span class="st">&quot;normal(0, 1)&quot;</span>,  <span class="at">class =</span> <span class="st">&quot;b&quot;</span>,         <span class="at">dpar =</span> <span class="st">&quot;theta2&quot;</span>)</span>
-<span id="cb2-51"><a href="#cb2-51" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-52"><a href="#cb2-52" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-53"><a href="#cb2-53" aria-hidden="true" tabindex="-1"></a><span class="do">##### 2. Sort by subject and build indexing #####</span></span>
-<span id="cb2-54"><a href="#cb2-54" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-55"><a href="#cb2-55" aria-hidden="true" tabindex="-1"></a><span class="do">### 1. Sort data by subject</span></span>
-<span id="cb2-56"><a href="#cb2-56" aria-hidden="true" tabindex="-1"></a>combo <span class="ot">&lt;-</span> combo[<span class="fu">order</span>(combo<span class="sc">$</span>id), ]</span>
-<span id="cb2-57"><a href="#cb2-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-58"><a href="#cb2-58" aria-hidden="true" tabindex="-1"></a><span class="do">### 2. Build brms standata</span></span>
-<span id="cb2-59"><a href="#cb2-59" aria-hidden="true" tabindex="-1"></a>dat_A <span class="ot">&lt;-</span> <span class="fu">make_standata</span>(</span>
-<span id="cb2-60"><a href="#cb2-60" aria-hidden="true" tabindex="-1"></a>  <span class="at">formula =</span> mix_formula,</span>
-<span id="cb2-61"><a href="#cb2-61" aria-hidden="true" tabindex="-1"></a>  <span class="at">data    =</span> combo,</span>
-<span id="cb2-62"><a href="#cb2-62" aria-hidden="true" tabindex="-1"></a>  <span class="at">family  =</span> <span class="fu">mixture</span>(von_mises, von_mises, <span class="at">order =</span> <span class="st">&quot;none&quot;</span>),</span>
-<span id="cb2-63"><a href="#cb2-63" aria-hidden="true" tabindex="-1"></a>  <span class="at">prior   =</span> prior_mix</span>
-<span id="cb2-64"><a href="#cb2-64" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-65"><a href="#cb2-65" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-66"><a href="#cb2-66" aria-hidden="true" tabindex="-1"></a>dat_B <span class="ot">&lt;-</span> <span class="fu">make_standata</span>(</span>
-<span id="cb2-67"><a href="#cb2-67" aria-hidden="true" tabindex="-1"></a>  <span class="at">formula =</span> formula_B,</span>
-<span id="cb2-68"><a href="#cb2-68" aria-hidden="true" tabindex="-1"></a>  <span class="at">data    =</span> combo,</span>
-<span id="cb2-69"><a href="#cb2-69" aria-hidden="true" tabindex="-1"></a>  <span class="at">family  =</span> <span class="fu">mixture</span>(von_mises, von_mises, <span class="at">order =</span> <span class="st">&quot;none&quot;</span>),</span>
-<span id="cb2-70"><a href="#cb2-70" aria-hidden="true" tabindex="-1"></a>  <span class="at">prior   =</span> prior_B</span>
-<span id="cb2-71"><a href="#cb2-71" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-72"><a href="#cb2-72" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-73"><a href="#cb2-73" aria-hidden="true" tabindex="-1"></a><span class="do">### 3. Subject indexing</span></span>
-<span id="cb2-74"><a href="#cb2-74" aria-hidden="true" tabindex="-1"></a>subj_counts <span class="ot">&lt;-</span> <span class="fu">table</span>(combo<span class="sc">$</span>id)</span>
-<span id="cb2-75"><a href="#cb2-75" aria-hidden="true" tabindex="-1"></a>start_idx   <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(<span class="fu">cumsum</span>(<span class="fu">c</span>(<span class="dv">1</span>, <span class="fu">head</span>(subj_counts, <span class="sc">-</span><span class="dv">1</span>))))</span>
-<span id="cb2-76"><a href="#cb2-76" aria-hidden="true" tabindex="-1"></a>end_idx     <span class="ot">&lt;-</span> <span class="fu">as.integer</span>(<span class="fu">cumsum</span>(subj_counts))</span>
-<span id="cb2-77"><a href="#cb2-77" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-78"><a href="#cb2-78" aria-hidden="true" tabindex="-1"></a><span class="do">### 4. Build Z matrices (must match Stan: 12 cols for A, 6 for B)</span></span>
-<span id="cb2-79"><a href="#cb2-79" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-80"><a href="#cb2-80" aria-hidden="true" tabindex="-1"></a>Z_A <span class="ot">&lt;-</span> <span class="fu">cbind</span>(</span>
-<span id="cb2-81"><a href="#cb2-81" aria-hidden="true" tabindex="-1"></a>  dat_A<span class="sc">$</span>Z_1_mu1_1, dat_A<span class="sc">$</span>Z_1_mu1_2, dat_A<span class="sc">$</span>Z_1_mu1_3, dat_A<span class="sc">$</span>Z_1_mu1_4,</span>
-<span id="cb2-82"><a href="#cb2-82" aria-hidden="true" tabindex="-1"></a>  dat_A<span class="sc">$</span>Z_2_kappa1_1, dat_A<span class="sc">$</span>Z_2_kappa1_2, dat_A<span class="sc">$</span>Z_2_kappa1_3, dat_A<span class="sc">$</span>Z_2_kappa1_4,</span>
-<span id="cb2-83"><a href="#cb2-83" aria-hidden="true" tabindex="-1"></a>  dat_A<span class="sc">$</span>Z_3_theta2_1, dat_A<span class="sc">$</span>Z_3_theta2_2, dat_A<span class="sc">$</span>Z_3_theta2_3, dat_A<span class="sc">$</span>Z_3_theta2_4</span>
-<span id="cb2-84"><a href="#cb2-84" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-85"><a href="#cb2-85" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-86"><a href="#cb2-86" aria-hidden="true" tabindex="-1"></a>Z_B <span class="ot">&lt;-</span> <span class="fu">cbind</span>(</span>
-<span id="cb2-87"><a href="#cb2-87" aria-hidden="true" tabindex="-1"></a>  dat_B<span class="sc">$</span>Z_1_kappa1_1, dat_B<span class="sc">$</span>Z_1_kappa1_2, dat_B<span class="sc">$</span>Z_1_kappa1_3,</span>
-<span id="cb2-88"><a href="#cb2-88" aria-hidden="true" tabindex="-1"></a>  dat_B<span class="sc">$</span>Z_2_theta2_1, dat_B<span class="sc">$</span>Z_2_theta2_2, dat_B<span class="sc">$</span>Z_2_theta2_3</span>
-<span id="cb2-89"><a href="#cb2-89" aria-hidden="true" tabindex="-1"></a>)</span>
-<span id="cb2-90"><a href="#cb2-90" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-91"><a href="#cb2-91" aria-hidden="true" tabindex="-1"></a><span class="do">### 5. Build final stan_data (names MUST match Stan exactly)</span></span>
-<span id="cb2-92"><a href="#cb2-92" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-93"><a href="#cb2-93" aria-hidden="true" tabindex="-1"></a>stan_data <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
-<span id="cb2-94"><a href="#cb2-94" aria-hidden="true" tabindex="-1"></a>  <span class="at">N       =</span> <span class="fu">nrow</span>(combo),</span>
-<span id="cb2-95"><a href="#cb2-95" aria-hidden="true" tabindex="-1"></a>  <span class="at">Y       =</span> <span class="fu">as.vector</span>(combo<span class="sc">$</span>valuebias_rad),</span>
-<span id="cb2-96"><a href="#cb2-96" aria-hidden="true" tabindex="-1"></a>  <span class="at">N_subj  =</span> <span class="fu">length</span>(<span class="fu">unique</span>(combo<span class="sc">$</span>id)),</span>
-<span id="cb2-97"><a href="#cb2-97" aria-hidden="true" tabindex="-1"></a>  <span class="at">start_idx =</span> start_idx,</span>
-<span id="cb2-98"><a href="#cb2-98" aria-hidden="true" tabindex="-1"></a>  <span class="at">end_idx   =</span> end_idx,</span>
-<span id="cb2-99"><a href="#cb2-99" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-100"><a href="#cb2-100" aria-hidden="true" tabindex="-1"></a>  <span class="co"># MODEL A</span></span>
-<span id="cb2-101"><a href="#cb2-101" aria-hidden="true" tabindex="-1"></a>  <span class="at">K_mu_A        =</span> dat_A<span class="sc">$</span>K_mu1,</span>
-<span id="cb2-102"><a href="#cb2-102" aria-hidden="true" tabindex="-1"></a>  <span class="at">Xc_mu_A       =</span> <span class="fu">as.matrix</span>(dat_A<span class="sc">$</span>X_mu1),</span>
-<span id="cb2-103"><a href="#cb2-103" aria-hidden="true" tabindex="-1"></a>  <span class="at">means_X_mu_A  =</span> <span class="fu">rep</span>(<span class="dv">0</span>, dat_A<span class="sc">$</span>K_mu1),</span>
-<span id="cb2-104"><a href="#cb2-104" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-105"><a href="#cb2-105" aria-hidden="true" tabindex="-1"></a>  <span class="at">K_kappa_A       =</span> dat_A<span class="sc">$</span>K_kappa1,</span>
-<span id="cb2-106"><a href="#cb2-106" aria-hidden="true" tabindex="-1"></a>  <span class="at">Xc_kappa_A      =</span> <span class="fu">as.matrix</span>(dat_A<span class="sc">$</span>X_kappa1),</span>
-<span id="cb2-107"><a href="#cb2-107" aria-hidden="true" tabindex="-1"></a>  <span class="at">means_X_kappa_A =</span> <span class="fu">rep</span>(<span class="dv">0</span>, dat_A<span class="sc">$</span>K_kappa1),</span>
-<span id="cb2-108"><a href="#cb2-108" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-109"><a href="#cb2-109" aria-hidden="true" tabindex="-1"></a>  <span class="at">K_theta_A       =</span> dat_A<span class="sc">$</span>K_theta2,</span>
-<span id="cb2-110"><a href="#cb2-110" aria-hidden="true" tabindex="-1"></a>  <span class="at">Xc_theta_A      =</span> <span class="fu">as.matrix</span>(dat_A<span class="sc">$</span>X_theta2),</span>
-<span id="cb2-111"><a href="#cb2-111" aria-hidden="true" tabindex="-1"></a>  <span class="at">means_X_theta_A =</span> <span class="fu">rep</span>(<span class="dv">0</span>, dat_A<span class="sc">$</span>K_theta2),</span>
-<span id="cb2-112"><a href="#cb2-112" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-113"><a href="#cb2-113" aria-hidden="true" tabindex="-1"></a>  <span class="at">Z_A =</span> <span class="fu">as.matrix</span>(Z_A),</span>
-<span id="cb2-114"><a href="#cb2-114" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-115"><a href="#cb2-115" aria-hidden="true" tabindex="-1"></a>  <span class="co"># MODEL B</span></span>
-<span id="cb2-116"><a href="#cb2-116" aria-hidden="true" tabindex="-1"></a>  <span class="at">dist_to_colour =</span> <span class="fu">as.vector</span>(combo<span class="sc">$</span>dist_to_colour),</span>
-<span id="cb2-117"><a href="#cb2-117" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-118"><a href="#cb2-118" aria-hidden="true" tabindex="-1"></a>  <span class="at">K_kappa_B       =</span> dat_B<span class="sc">$</span>K_kappa1,</span>
-<span id="cb2-119"><a href="#cb2-119" aria-hidden="true" tabindex="-1"></a>  <span class="at">Xc_kappa_B      =</span> <span class="fu">as.matrix</span>(dat_B<span class="sc">$</span>X_kappa1),</span>
-<span id="cb2-120"><a href="#cb2-120" aria-hidden="true" tabindex="-1"></a>  <span class="at">means_X_kappa_B =</span> <span class="fu">rep</span>(<span class="dv">0</span>, dat_B<span class="sc">$</span>K_kappa1),</span>
-<span id="cb2-121"><a href="#cb2-121" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-122"><a href="#cb2-122" aria-hidden="true" tabindex="-1"></a>  <span class="at">K_theta_B       =</span> dat_B<span class="sc">$</span>K_theta2,</span>
-<span id="cb2-123"><a href="#cb2-123" aria-hidden="true" tabindex="-1"></a>  <span class="at">Xc_theta_B      =</span> <span class="fu">as.matrix</span>(dat_B<span class="sc">$</span>X_theta2),</span>
-<span id="cb2-124"><a href="#cb2-124" aria-hidden="true" tabindex="-1"></a>  <span class="at">means_X_theta_B =</span> <span class="fu">rep</span>(<span class="dv">0</span>, dat_B<span class="sc">$</span>K_theta2),</span>
-<span id="cb2-125"><a href="#cb2-125" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb2-126"><a href="#cb2-126" aria-hidden="true" tabindex="-1"></a>  <span class="at">Z_B =</span> <span class="fu">as.matrix</span>(Z_B)</span>
-<span id="cb2-127"><a href="#cb2-127" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
 </div>
 <p>Some people show response biases which are very far rightward of the correct (averaged) response, which might indicate exclusive attention to the motion information from the reward-signalling dots and therefore use of Strategy 2. Other people have intercepts close to 0 with very wide confidence intervals, which might indicate use of Strategy 3.</p>
 <p>Christin and I have been discussing how to model our data in a way that accounts for the use of different strategies. One way to do this would be to create a model that classifies each individual as a user of one of these three strategies, then models our parameters of interest only for those individuals who are classified as <em>averaging</em> responders (i.e., we’re confident they’re doing the task as instructed). This should give us tighter estimates for our effects of interest: they won’t be inflated by responders who only focus on the reward-signalling info or diluted by guessers.</p>
@@ -5118,35 +4926,6 @@ vertical-align: -.125em;
 <h3 class="anchored" data-anchor-id="strategy-classification">Strategy classification</h3>
 <p>Recalling that the model specifies one group-level mixture of response strategies in the data, let’s have a look at that.</p>
 <div class="cell">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>pi_samples <span class="ot">&lt;-</span> fit<span class="sc">$</span><span class="fu">draws</span>(<span class="st">&quot;pi_strategy&quot;</span>, <span class="at">format =</span> <span class="st">&quot;draws_df&quot;</span>)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>pi_summary <span class="ot">&lt;-</span> pi_samples <span class="sc">%&gt;%</span></span>
-<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="fu">starts_with</span>(<span class="st">&quot;pi_strategy&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="fu">everything</span>(), </span>
-<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>               <span class="at">names_to =</span> <span class="st">&quot;strategy_index&quot;</span>, </span>
-<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>               <span class="at">values_to =</span> <span class="st">&quot;probability&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">strategy_name =</span> <span class="fu">case_when</span>(</span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    strategy_index <span class="sc">==</span> <span class="st">&quot;pi_strategy[1]&quot;</span> <span class="sc">~</span> <span class="st">&quot;Averaging&quot;</span>,</span>
-<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    strategy_index <span class="sc">==</span> <span class="st">&quot;pi_strategy[2]&quot;</span> <span class="sc">~</span> <span class="st">&quot;Reporting Colour&quot;</span>,</span>
-<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    strategy_index <span class="sc">==</span> <span class="st">&quot;pi_strategy[3]&quot;</span> <span class="sc">~</span> <span class="st">&quot;Guessing&quot;</span></span>
-<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">%&gt;%</span></span>
-<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(strategy_name) <span class="sc">%&gt;%</span></span>
-<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_prob =</span> <span class="fu">mean</span>(probability),</span>
-<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">lower_95 =</span> <span class="fu">quantile</span>(probability, <span class="fl">0.025</span>),</span>
-<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">upper_95 =</span> <span class="fu">quantile</span>(probability, <span class="fl">0.975</span>)</span>
-<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning: Dropping &#39;draws_df&#39; class as required metadata was removed.</code></pre>
-</div>
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Print the results for your team</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(pi_summary)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 3 × 4
   strategy_name    mean_prob lower_95 upper_95
@@ -5154,61 +4933,6 @@ vertical-align: -.125em;
 1 Averaging            0.692   0.571     0.801
 2 Guessing             0.187   0.0975    0.292
 3 Reporting Colour     0.121   0.0549    0.209</code></pre>
-</div>
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Visualization</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Plot with matching visual language</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(pi_summary, <span class="fu">aes</span>(<span class="at">x =</span> strategy_name, <span class="at">y =</span> mean_prob, <span class="at">fill =</span> strategy_name)) <span class="sc">+</span></span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="at">width =</span> <span class="fl">0.7</span>, <span class="at">color =</span> <span class="st">&quot;black&quot;</span>, <span class="at">linewidth =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_errorbar</span>(<span class="fu">aes</span>(<span class="at">ymin =</span> lower_95, <span class="at">ymax =</span> upper_95), </span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>                <span class="at">width =</span> <span class="fl">0.1</span>, <span class="at">linewidth =</span> <span class="fl">0.8</span>) <span class="sc">+</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(</span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;Averaging&quot;</span> <span class="ot">=</span> <span class="st">&quot;purple&quot;</span>,    <span class="co"># Matches your &#39;Lo&#39; blue</span></span>
-<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;Reporting Colour&quot;</span> <span class="ot">=</span> <span class="st">&quot;#ff6117&quot;</span>, <span class="co"># Matches your &#39;Hi&#39; orange</span></span>
-<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">&quot;Guessing&quot;</span> <span class="ot">=</span> <span class="st">&quot;#888888&quot;</span>      <span class="co"># Neutral gray for noise</span></span>
-<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  )) <span class="sc">+</span></span>
-<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Group Prevalence (Probability)&quot;</span>, </span>
-<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;&quot;</span>, </span>
-<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Latent Strategy Mixture&quot;</span></span>
-<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Customizing the theme to match your Roboto Condensed / Minimal style</span></span>
-<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">14</span>, <span class="at">base_family =</span> <span class="st">&quot;RobotoCondensed&quot;</span>) <span class="sc">+</span></span>
-<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>(), </span>
-<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.line =</span> <span class="fu">element_line</span>(<span class="at">color =</span> <span class="st">&quot;black&quot;</span>), </span>
-<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.ticks =</span> <span class="fu">element_line</span>(<span class="at">color =</span> <span class="st">&quot;black&quot;</span>),</span>
-<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">&quot;none&quot;</span> <span class="co"># Categories are on x-axis, legend is redundant</span></span>
-<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family
-not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family
-not found in Windows font database
-Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family
-not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database</code></pre>
 </div>
 <div class="cell-output-display">
 <div>
@@ -5221,19 +4945,6 @@ font family not found in Windows font database</code></pre>
 <p>So at the group level, NOT doing any kind of splitting by participants, the model thinks that about 70% of responses are averaging, 20% are guesses, and 10% are from reporting the reward-signalling motion direction.</p>
 <p>Now, let’s have a look at how the model classifies each participant.</p>
 <div class="cell">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>strat_probs <span class="ot">&lt;-</span> fit<span class="sc">$</span><span class="fu">summary</span>(<span class="st">&quot;strategy_prob&quot;</span>, mean) <span class="sc">%&gt;%</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">stan_id =</span> <span class="fu">rep</span>(<span class="dv">1</span><span class="sc">:</span>stan_data<span class="sc">$</span>N_subj, <span class="at">times =</span> <span class="dv">3</span>),</span>
-<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">strategy =</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="st">&quot;1: Averaging&quot;</span>, <span class="st">&quot;2: Reporting Colour&quot;</span>, <span class="st">&quot;3: Guessing&quot;</span>), <span class="at">each =</span> stan_data<span class="sc">$</span>N_subj)</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(stan_id, strategy, mean) <span class="sc">%&gt;%</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> strategy, <span class="at">values_from =</span> mean)</span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="co"># View the top of the table</span></span>
-<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">head</span>(strat_probs))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 6 × 4
   stan_id `1: Averaging` `2: Reporting Colour` `3: Guessing`
@@ -5244,32 +4955,6 @@ font family not found in Windows font database</code></pre>
 4       4        1                    6.03e-25      1.00e-85
 5       5        1                    2.53e-29      9.27e-83
 6       6        1                    4.43e-21      1.49e-80</code></pre>
-</div>
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 2. STRATEGY HEATMAP ---</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Visualizing the distribution of strategies across the whole cohort</span></span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
-<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(strat_probs <span class="sc">%&gt;%</span> <span class="fu">pivot_longer</span>(<span class="sc">-</span>stan_id, <span class="at">names_to =</span> <span class="st">&quot;Strategy&quot;</span>, <span class="at">values_to =</span> <span class="st">&quot;Prob&quot;</span>), </span>
-<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>       <span class="fu">aes</span>(<span class="at">x =</span> Strategy, <span class="at">y =</span> <span class="fu">factor</span>(stan_id), <span class="at">fill =</span> Prob)) <span class="sc">+</span></span>
-<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_tile</span>(<span class="at">color =</span> <span class="st">&quot;black&quot;</span>, <span class="at">size =</span> <span class="fl">0.025</span>) <span class="sc">+</span> <span class="co"># Added thin white borders for a &quot;grid&quot; look</span></span>
-<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># White to Navy Gradient</span></span>
-<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_gradient</span>(<span class="at">low =</span> <span class="st">&quot;#eeeeee&quot;</span>, <span class="at">high =</span> <span class="st">&quot;#000080&quot;</span>, <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">+</span> </span>
-<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
-<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;Strategy Classification Heatmap&quot;</span>,</span>
-<span id="cb14-12"><a href="#cb14-12" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">&quot;Strategy Type&quot;</span>, <span class="at">y =</span> <span class="st">&quot;Subject ID&quot;</span>, <span class="at">fill =</span> <span class="st">&quot;Probability&quot;</span>) <span class="sc">+</span></span>
-<span id="cb14-13"><a href="#cb14-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb14-14"><a href="#cb14-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.text.y =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">6</span>),</span>
-<span id="cb14-15"><a href="#cb14-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">panel.grid =</span> <span class="fu">element_blank</span>(), <span class="co"># Removes grid lines behind tiles</span></span>
-<span id="cb14-16"><a href="#cb14-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.position =</span> <span class="st">&quot;right&quot;</span>,</span>
-<span id="cb14-17"><a href="#cb14-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>),</span>
-<span id="cb14-18"><a href="#cb14-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">axis.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>)</span>
-<span id="cb14-19"><a href="#cb14-19" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
-ℹ Please use `linewidth` instead.</code></pre>
 </div>
 <div class="cell-output-display">
 <div>
@@ -5288,111 +4973,6 @@ font family not found in Windows font database</code></pre>
 </ul>
 <p>Let’s have a look at some examples of the model’s classification. First up, let’s look at a participant who was classified as an averager.</p>
 <div class="cell">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false      # Prevents the code itself from appearing in the document</span></span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| message: false   # Prevents package loading messages and brms/Stan progress</span></span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="co">#| warning: false   # Prevents warning messages</span></span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="co">#| error: false     # Prevents error messages from printing</span></span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>strat_probs <span class="ot">&lt;-</span> fit<span class="sc">$</span><span class="fu">summary</span>(<span class="st">&quot;strategy_prob&quot;</span>, mean) <span class="sc">%&gt;%</span></span>
-<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">stan_id =</span> <span class="fu">rep</span>(<span class="dv">1</span><span class="sc">:</span>stan_data<span class="sc">$</span>N_subj, <span class="at">times =</span> <span class="dv">3</span>),</span>
-<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">strategy =</span> <span class="fu">rep</span>(<span class="fu">c</span>(<span class="st">&quot;A: Averaging&quot;</span>, <span class="st">&quot;B: Color&quot;</span>, <span class="st">&quot;C: Guessing&quot;</span>), <span class="at">each =</span> stan_data<span class="sc">$</span>N_subj)</span>
-<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(stan_id, strategy, mean) <span class="sc">%&gt;%</span></span>
-<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> strategy, <span class="at">values_from =</span> mean)</span>
-<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>check_subject_ppc <span class="ot">&lt;-</span> <span class="cf">function</span>(target_id, data_list, obs_deg, interaction_vec, strat_probs) {</span>
-<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 1. Slice indexing for this specific subject</span></span>
-<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>  start <span class="ot">&lt;-</span> data_list<span class="sc">$</span>start_idx[target_id]</span>
-<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>  end   <span class="ot">&lt;-</span> data_list<span class="sc">$</span>end_idx[target_id]</span>
-<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>  idx   <span class="ot">&lt;-</span> start<span class="sc">:</span>end</span>
-<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 2. Create a clean dataframe for plotting</span></span>
-<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>  df_sub <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
-<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">error =</span> obs_deg[idx],</span>
-<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">condition =</span> interaction_vec[idx]</span>
-<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 3. Get strategy probabilities for the subtitle</span></span>
-<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Assumes &#39;stan_id&#39; matches &#39;target_id&#39;</span></span>
-<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a>  probs <span class="ot">&lt;-</span> strat_probs <span class="sc">%&gt;%</span> <span class="fu">filter</span>(stan_id <span class="sc">==</span> target_id)</span>
-<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a>  strat_text <span class="ot">&lt;-</span> <span class="fu">sprintf</span>(<span class="st">&quot;Averaging: %.2f | Reporting colour: %.2f | Guessing: %.2f&quot;</span>, </span>
-<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a>                        probs<span class="sc">$</span><span class="st">`</span><span class="at">A: Averaging</span><span class="st">`</span>, probs<span class="sc">$</span><span class="st">`</span><span class="at">B: Color</span><span class="st">`</span>, probs<span class="sc">$</span><span class="st">`</span><span class="at">C: Guessing</span><span class="st">`</span>)</span>
-<span id="cb16-32"><a href="#cb16-32" aria-hidden="true" tabindex="-1"></a>  </span>
-<span id="cb16-33"><a href="#cb16-33" aria-hidden="true" tabindex="-1"></a>  <span class="co"># 4. Plot Observed Density only</span></span>
-<span id="cb16-34"><a href="#cb16-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(df_sub, <span class="fu">aes</span>(<span class="at">x =</span> error, <span class="at">fill=</span><span class="st">&#39;grey&#39;</span>)) <span class="sc">+</span></span>
-<span id="cb16-35"><a href="#cb16-35" aria-hidden="true" tabindex="-1"></a>    <span class="co"># The &#39;after_stat(count)&#39; or just standard density</span></span>
-<span id="cb16-36"><a href="#cb16-36" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_density</span>(<span class="at">alpha =</span> <span class="fl">0.4</span>, <span class="at">color =</span> <span class="st">&quot;black&quot;</span>, <span class="at">linewidth =</span> <span class="fl">0.3</span>) <span class="sc">+</span></span>
-<span id="cb16-37"><a href="#cb16-37" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Red dashed line at 0 (Perfect Averaging)</span></span>
-<span id="cb16-38"><a href="#cb16-38" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> <span class="dv">0</span>, <span class="at">linetype =</span> <span class="st">&quot;dashed&quot;</span>, <span class="at">color =</span> <span class="st">&quot;red&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.6</span>) <span class="sc">+</span></span>
-<span id="cb16-39"><a href="#cb16-39" aria-hidden="true" tabindex="-1"></a>    <span class="fu">facet_wrap</span>(<span class="sc">~</span> condition, <span class="at">nrow =</span> <span class="dv">3</span>, <span class="at">ncol =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
-<span id="cb16-40"><a href="#cb16-40" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Zoom into the circle (usually -180 to 180)</span></span>
-<span id="cb16-41"><a href="#cb16-41" aria-hidden="true" tabindex="-1"></a>    <span class="fu">coord_cartesian</span>(<span class="at">xlim =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="dv">180</span>, <span class="dv">180</span>)) <span class="sc">+</span></span>
-<span id="cb16-42"><a href="#cb16-42" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(</span>
-<span id="cb16-43"><a href="#cb16-43" aria-hidden="true" tabindex="-1"></a>      <span class="at">title =</span> <span class="fu">paste</span>(<span class="st">&quot;Response Distribution | Subject ID:&quot;</span>, target_id),</span>
-<span id="cb16-44"><a href="#cb16-44" aria-hidden="true" tabindex="-1"></a>      <span class="at">subtitle =</span> strat_text,</span>
-<span id="cb16-45"><a href="#cb16-45" aria-hidden="true" tabindex="-1"></a>      <span class="at">x =</span> <span class="st">&quot;Response Error (Degrees)&quot;</span>,</span>
-<span id="cb16-46"><a href="#cb16-46" aria-hidden="true" tabindex="-1"></a>      <span class="at">y =</span> <span class="st">&quot;Density&quot;</span>,</span>
-<span id="cb16-47"><a href="#cb16-47" aria-hidden="true" tabindex="-1"></a>      <span class="at">fill =</span> <span class="st">&quot;Condition&quot;</span></span>
-<span id="cb16-48"><a href="#cb16-48" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">+</span></span>
-<span id="cb16-49"><a href="#cb16-49" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>(<span class="at">base_family =</span> <span class="st">&quot;RobotoCondensed&quot;</span>) <span class="sc">+</span></span>
-<span id="cb16-50"><a href="#cb16-50" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(</span>
-<span id="cb16-51"><a href="#cb16-51" aria-hidden="true" tabindex="-1"></a>      <span class="at">panel.grid.minor =</span> <span class="fu">element_blank</span>(),</span>
-<span id="cb16-52"><a href="#cb16-52" aria-hidden="true" tabindex="-1"></a>      <span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">8</span>, <span class="at">face =</span> <span class="st">&quot;bold&quot;</span>),</span>
-<span id="cb16-53"><a href="#cb16-53" aria-hidden="true" tabindex="-1"></a>      <span class="at">legend.position =</span> <span class="st">&quot;none&quot;</span>, <span class="co"># Conditions are already in facets</span></span>
-<span id="cb16-54"><a href="#cb16-54" aria-hidden="true" tabindex="-1"></a>      <span class="at">axis.line =</span> <span class="fu">element_line</span>(<span class="at">color =</span> <span class="st">&quot;black&quot;</span>)</span>
-<span id="cb16-55"><a href="#cb16-55" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb16-56"><a href="#cb16-56" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb16-57"><a href="#cb16-57" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb16-58"><a href="#cb16-58" aria-hidden="true" tabindex="-1"></a><span class="fu">check_subject_ppc</span>(</span>
-<span id="cb16-59"><a href="#cb16-59" aria-hidden="true" tabindex="-1"></a>  <span class="at">target_id =</span> <span class="dv">22</span>, </span>
-<span id="cb16-60"><a href="#cb16-60" aria-hidden="true" tabindex="-1"></a>  <span class="at">data_list =</span> stan_data, <span class="co"># The list you sent to Stan</span></span>
-<span id="cb16-61"><a href="#cb16-61" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs_deg =</span> stan_data<span class="sc">$</span>Y<span class="sc">*</span><span class="dv">180</span><span class="sc">/</span>pi, </span>
-<span id="cb16-62"><a href="#cb16-62" aria-hidden="true" tabindex="-1"></a>  <span class="at">interaction_vec =</span> group_interaction, </span>
-<span id="cb16-63"><a href="#cb16-63" aria-hidden="true" tabindex="-1"></a>  <span class="at">strat_probs =</span> strat_probs</span>
-<span id="cb16-64"><a href="#cb16-64" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family
-not found in Windows font database
-Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family
-not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family
-not found in Windows font database
-Warning in grid.Call(C_stringMetric, as.graphicsAnnot(x$label)): font family
-not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database</code></pre>
-</div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -5404,47 +4984,6 @@ font family not found in Windows font database</code></pre>
 <p>You can see that even though the patterns in the participant’s data are not 100% clean, the response peaks are mostly centred at or near 0.</p>
 <p>Now here’s someone who was classified as a reporter of the reward-signalling motion direction.</p>
 <div class="cell">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false      # Prevents the code itself from appearing in the document</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| message: false   # Prevents package loading messages and brms/Stan progress</span></span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a><span class="co">#| warning: false   # Prevents warning messages</span></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="co">#| error: false     # Prevents error messages from printing</span></span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a><span class="fu">check_subject_ppc</span>(</span>
-<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">target_id =</span> <span class="dv">43</span>, </span>
-<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">data_list =</span> stan_data, <span class="co"># The list you sent to Stan</span></span>
-<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs_deg =</span> stan_data<span class="sc">$</span>Y<span class="sc">*</span><span class="dv">180</span><span class="sc">/</span>pi, </span>
-<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">interaction_vec =</span> group_interaction, </span>
-<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">strat_probs =</span> strat_probs</span>
-<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database</code></pre>
-</div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -5456,47 +4995,6 @@ font family not found in Windows font database</code></pre>
 <p>Here, the peak (and indeed the bulk of the distribution in most cases) is centred right of 0, indicating that little attempt at averaging has been made.</p>
 <p>Here’s someone who’s been classified as a pure guesser:</p>
 <div class="cell">
-<details class="code-fold">
-<summary>Code</summary>
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false      # Prevents the code itself from appearing in the document</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| message: false   # Prevents package loading messages and brms/Stan progress</span></span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a><span class="co">#| warning: false   # Prevents warning messages</span></span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a><span class="co">#| error: false     # Prevents error messages from printing</span></span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="fu">check_subject_ppc</span>(</span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">target_id =</span> <span class="dv">34</span>, </span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">data_list =</span> stan_data, <span class="co"># The list you sent to Stan</span></span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs_deg =</span> stan_data<span class="sc">$</span>Y<span class="sc">*</span><span class="dv">180</span><span class="sc">/</span>pi, </span>
-<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">interaction_vec =</span> group_interaction, </span>
-<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">strat_probs =</span> strat_probs</span>
-<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</details>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database
-Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
-family not found in Windows font database</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database
-Warning in grid.Call.graphics(C_text, as.graphicsAnnot(x$label), x$x, x$y, :
-font family not found in Windows font database</code></pre>
-</div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -5509,18 +5007,18 @@ font family not found in Windows font database</code></pre>
 <div class="cell">
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false      # Prevents the code itself from appearing in the document</span></span>
-<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| message: false   # Prevents package loading messages and brms/Stan progress</span></span>
-<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="co">#| warning: false   # Prevents warning messages</span></span>
-<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a><span class="co">#| error: false     # Prevents error messages from printing</span></span>
-<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a><span class="fu">check_subject_ppc</span>(</span>
-<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">target_id =</span> <span class="dv">18</span>, </span>
-<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">data_list =</span> stan_data, <span class="co"># The list you sent to Stan</span></span>
-<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs_deg =</span> stan_data<span class="sc">$</span>Y<span class="sc">*</span><span class="dv">180</span><span class="sc">/</span>pi, </span>
-<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">interaction_vec =</span> group_interaction, </span>
-<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">strat_probs =</span> strat_probs</span>
-<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="co">#| echo: false      # Prevents the code itself from appearing in the document</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co">#| message: false   # Prevents package loading messages and brms/Stan progress</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="co">#| warning: false   # Prevents warning messages</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="co">#| error: false     # Prevents error messages from printing</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="fu">check_subject_ppc</span>(</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">target_id =</span> <span class="dv">18</span>, </span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">data_list =</span> stan_data, <span class="co"># The list you sent to Stan</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs_deg =</span> stan_data<span class="sc">$</span>Y<span class="sc">*</span><span class="dv">180</span><span class="sc">/</span>pi, </span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">interaction_vec =</span> group_interaction, </span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">strat_probs =</span> strat_probs</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stderr">
 <pre><code>Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font
@@ -5557,13 +5055,13 @@ font family not found in Windows font database</code></pre>
 </div>
 <details class="code-fold">
 <summary>Code</summary>
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="fu">check_subject_ppc</span>(</span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">target_id =</span> <span class="dv">31</span>, </span>
-<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">data_list =</span> stan_data, <span class="co"># The list you sent to Stan</span></span>
-<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs_deg =</span> stan_data<span class="sc">$</span>Y<span class="sc">*</span><span class="dv">180</span><span class="sc">/</span>pi, </span>
-<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">interaction_vec =</span> group_interaction, </span>
-<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">strat_probs =</span> strat_probs</span>
-<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">check_subject_ppc</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">target_id =</span> <span class="dv">31</span>, </span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">data_list =</span> stan_data, <span class="co"># The list you sent to Stan</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">obs_deg =</span> stan_data<span class="sc">$</span>Y<span class="sc">*</span><span class="dv">180</span><span class="sc">/</span>pi, </span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">interaction_vec =</span> group_interaction, </span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">strat_probs =</span> strat_probs</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 <div class="cell-output cell-output-stderr">
 <pre><code>Warning in grid.Call(C_textBounds, as.graphicsAnnot(x$label), x$x, x$y, : font

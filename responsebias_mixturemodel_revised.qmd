@@ -28,7 +28,6 @@ Something we discussed in our meeting a couple of weeks ago was the possibility 
 In previous versions of our modelling, there were some indications that a handful of people are using Strategies 2 and 3. Let's look at the raw data for each individual's response bias, collapsed over conditions:
 
 ```{r}
-
 #| echo: false      # Prevents the code itself from appearing in the document
 #| message: false   # Prevents package loading messages and brms/Stan progress
 #| warning: false   # Prevents warning messages
@@ -372,7 +371,10 @@ This is the best fit we've seen yet. The only issue is that the model is shiftin
 Recalling that the model specifies one group-level mixture of response strategies in the data, let's have a look at that.
 
 ```{r}
-
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
 
 pi_samples <- fit$draws("pi_strategy", format = "draws_df")
 
@@ -428,6 +430,10 @@ So at the group level, NOT doing any kind of splitting by participants, the mode
 Now, let's have a look at how the model classifies each participant.
 
 ```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
 
 strat_probs <- fit$summary("strategy_prob", mean) %>%
   mutate(
@@ -474,7 +480,6 @@ This looks pretty good to me! A few points of interest:
 Let's have a look at some examples of the model's classification. First up, let's look at a participant who was classified as an averager.
 
 ```{r}
-
 #| echo: false      # Prevents the code itself from appearing in the document
 #| message: false   # Prevents package loading messages and brms/Stan progress
 #| warning: false   # Prevents warning messages
@@ -547,7 +552,6 @@ You can see that even though the patterns in the participant's data are not 100%
 Now here's someone who was classified as a reporter of the reward-signalling motion direction.
 
 ```{r}
-
 #| echo: false      # Prevents the code itself from appearing in the document
 #| message: false   # Prevents package loading messages and brms/Stan progress
 #| warning: false   # Prevents warning messages
@@ -567,7 +571,6 @@ Here, the peak (and indeed the bulk of the distribution in most cases) is centre
 Here's someone who's been classified as a pure guesser:
 
 ```{r}
-
 #| echo: false      # Prevents the code itself from appearing in the document
 #| message: false   # Prevents package loading messages and brms/Stan progress
 #| warning: false   # Prevents warning messages
