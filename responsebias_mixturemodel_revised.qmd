@@ -1,0 +1,801 @@
+---
+title: "Dot motion task: modelling response strategy"
+format: html
+editor: visual
+html:
+    toc: true
+    toc-location: right
+    toc-expand: true
+    code-fold: true
+    mathjax: true
+
+project:
+  type: website
+  output-dir: docs
+
+execute:
+  freeze: auto
+---
+
+## Modelling response strategy
+
+Something we discussed in our meeting a couple of weeks ago was the possibility that participants are using different response *strategies*. Broadly speaking, we might expect three strategies for this task:
+
+1.  *Averaging*: attempting to position the response dial exactly halfway between the two motion directions. This is how we instruct people to do the task.
+2.  *Response to colour*: positioning the response dial to match the motion direction for the coloured (reward-signalling) group of dots. No attempt is made to average this motion direction with that of the grey dots.
+3.  *Guessing*: Positioning the response dial at random; no systematic correspondence between dial position and motion information.
+
+In previous versions of our modelling, there were some indications that a handful of people are using Strategies 2 and 3. Let's look at the raw data for each individual's response bias, collapsed over conditions:
+
+```{r}
+
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+pacman::p_load(brms, emmeans, bayestestR,	tidybayes, dplyr, ggplot2, bayesplot, ggh4x, knitr, kableExtra, cmdstanr, tidyverse, patchwork)
+
+df=read.csv("exptrialdata_merged.csv")
+
+df$coherence=as.factor(df$coherence)
+df$trialval=as.factor(df$trialval)
+
+df$valuebias_rad = (df$valuebias*pi/180)
+df$colourangle_rad = (df$colourangle*pi/180)
+df$greyangle_rad = (df$greyangle*pi/180)
+df$response_rad = (df$response*pi/180)
+df$id_orig = df$id
+df$id = as.numeric(factor(df$pnum))
+
+df$block = as.factor(ceiling(df$trialnum/60))
+
+core = filter(df, trialtype=="core" & soft_timeout_flag == 0)
+combo = filter(df, trialtype!="comp" & soft_timeout_flag == 0)
+
+plot_data_id <- combo %>%
+  group_by(id) %>%
+  summarise(
+    mean_bias = mean(valuebias_rad, na.rm = TRUE),
+    n = n(),
+    sd_bias = sd(valuebias_rad, na.rm = TRUE)
+  ) %>%
+  mutate(
+    se = sd_bias / sqrt(n),
+    lower_95 = mean_bias - 1.96 * se,
+    upper_95 = mean_bias + 1.96 * se,
+    lower_66 = mean_bias - 0.95 * se,
+    upper_66 = mean_bias + 0.95 * se,
+    is_biased = ifelse(lower_95 > 0 | upper_95 < 0, "Significantly Biased", "Consistent with 0")
+  ) %>%
+  mutate(id = reorder(as.factor(id), mean_bias))
+
+ggplot(plot_data_id, aes(x = id, y = mean_bias)) +
+  geom_errorbar(aes(ymin = lower_95, ymax = upper_95), width = 0, alpha = 0.6) +
+  geom_linerange(aes(ymin = lower_66, ymax = upper_66), linewidth = 1.2) +
+  geom_point(size = 1.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", alpha = 0.4) +
+  coord_flip() +
+  labs(
+    title = "Participant Mean Response Bias",
+    subtitle = "Color indicates 95% CI does not overlap with 0 (Perfect Averaging)",
+    x = "Participant ID (Ranked)",
+    y = "Mean Bias (radians)",
+    color = "Classification"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.text.y = element_text(size = 7)
+  )
+
+
+##### 1. Build brms design objects #####
+
+# MODEL A
+mix_formula <- bf(
+  valuebias_rad ~ 1, 
+  mu1    ~ trialval * coherence + (trialval * coherence | id),
+  kappa1 ~ trialval * coherence + (trialval * coherence | id),
+  mu2    ~ 1,
+  kappa2 ~ 1,
+  theta2 ~ trialval * coherence + (trialval * coherence | id)
+)
+
+prior_mix <- c(
+  set_prior("normal(0, 0.5)", class = "Intercept", dpar = "mu1"),
+  set_prior("normal(0, 0.5)", class = "b",         dpar = "mu1"),
+  set_prior("exponential(5)", class = "sd",        dpar = "mu1"),
+  set_prior("normal(1, 1)",   class = "Intercept", dpar = "kappa1"),
+  set_prior("normal(0, 1)",   class = "b",         dpar = "kappa1"),
+  set_prior("exponential(5)", class = "sd",        dpar = "kappa1"),
+  set_prior("constant(0)",    class = "Intercept", dpar = "mu2"),
+  set_prior("constant(-100)", class = "Intercept", dpar = "kappa2"),
+  set_prior("normal(0, 1)",   class = "Intercept", dpar = "theta2"),
+  set_prior("normal(0, 1)",   class = "b",         dpar = "theta2"),
+  set_prior("exponential(5)", class = "sd",        dpar = "theta2"),
+  set_prior("lkj(2)",         class = "cor")
+)
+
+# MODEL B
+combo$dist_to_colour <- abs(atan2(
+  sin(combo$colourangle_rad - combo$greyangle_rad),
+  cos(combo$colourangle_rad - combo$greyangle_rad)
+)) / 2
+
+formula_B <- bf(
+  valuebias_rad ~ 1, 
+  mu1    ~ 0 + dist_to_colour,
+  kappa1 ~ coherence + (coherence | id),
+  mu2    ~ 1,
+  kappa2 ~ 1,
+  theta2 ~ coherence + (coherence | id)
+)
+
+prior_B <- c(
+  set_prior("constant(1)",  class = "b",         dpar = "mu1"),
+  set_prior("normal(1, 1)", class = "Intercept", dpar = "kappa1"),
+  set_prior("normal(0, 1)", class = "b",         dpar = "kappa1"),
+  set_prior("constant(0)",  class = "Intercept", dpar = "mu2"),
+  set_prior("constant(-100)", class = "Intercept", dpar = "kappa2"),
+  set_prior("normal(-1, 1)", class = "Intercept", dpar = "theta2"),
+  set_prior("normal(0, 1)",  class = "b",         dpar = "theta2")
+)
+
+##### 2. Sort by subject and build indexing #####
+
+### 1. Sort data by subject
+combo <- combo[order(combo$id), ]
+
+### 2. Build brms standata
+dat_A <- make_standata(
+  formula = mix_formula,
+  data    = combo,
+  family  = mixture(von_mises, von_mises, order = "none"),
+  prior   = prior_mix
+)
+
+dat_B <- make_standata(
+  formula = formula_B,
+  data    = combo,
+  family  = mixture(von_mises, von_mises, order = "none"),
+  prior   = prior_B
+)
+
+### 3. Subject indexing
+subj_counts <- table(combo$id)
+start_idx   <- as.integer(cumsum(c(1, head(subj_counts, -1))))
+end_idx     <- as.integer(cumsum(subj_counts))
+
+### 4. Build Z matrices (must match Stan: 12 cols for A, 6 for B)
+
+Z_A <- cbind(
+  dat_A$Z_1_mu1_1, dat_A$Z_1_mu1_2, dat_A$Z_1_mu1_3, dat_A$Z_1_mu1_4,
+  dat_A$Z_2_kappa1_1, dat_A$Z_2_kappa1_2, dat_A$Z_2_kappa1_3, dat_A$Z_2_kappa1_4,
+  dat_A$Z_3_theta2_1, dat_A$Z_3_theta2_2, dat_A$Z_3_theta2_3, dat_A$Z_3_theta2_4
+)
+
+Z_B <- cbind(
+  dat_B$Z_1_kappa1_1, dat_B$Z_1_kappa1_2, dat_B$Z_1_kappa1_3,
+  dat_B$Z_2_theta2_1, dat_B$Z_2_theta2_2, dat_B$Z_2_theta2_3
+)
+
+### 5. Build final stan_data (names MUST match Stan exactly)
+
+stan_data <- list(
+  N       = nrow(combo),
+  Y       = as.vector(combo$valuebias_rad),
+  N_subj  = length(unique(combo$id)),
+  start_idx = start_idx,
+  end_idx   = end_idx,
+  
+  # MODEL A
+  K_mu_A        = dat_A$K_mu1,
+  Xc_mu_A       = as.matrix(dat_A$X_mu1),
+  means_X_mu_A  = rep(0, dat_A$K_mu1),
+  
+  K_kappa_A       = dat_A$K_kappa1,
+  Xc_kappa_A      = as.matrix(dat_A$X_kappa1),
+  means_X_kappa_A = rep(0, dat_A$K_kappa1),
+  
+  K_theta_A       = dat_A$K_theta2,
+  Xc_theta_A      = as.matrix(dat_A$X_theta2),
+  means_X_theta_A = rep(0, dat_A$K_theta2),
+  
+  Z_A = as.matrix(Z_A),
+  
+  # MODEL B
+  dist_to_colour = as.vector(combo$dist_to_colour),
+  
+  K_kappa_B       = dat_B$K_kappa1,
+  Xc_kappa_B      = as.matrix(dat_B$X_kappa1),
+  means_X_kappa_B = rep(0, dat_B$K_kappa1),
+  
+  K_theta_B       = dat_B$K_theta2,
+  Xc_theta_B      = as.matrix(dat_B$X_theta2),
+  means_X_theta_B = rep(0, dat_B$K_theta2),
+  
+  Z_B = as.matrix(Z_B)
+)
+
+```
+
+Some people show response biases which are very far rightward of the correct (averaged) response, which might indicate exclusive attention to the motion information from the reward-signalling dots and therefore use of Strategy 2. Other people have intercepts close to 0 with very wide confidence intervals, which might indicate use of Strategy 3.
+
+Christin and I have been discussing how to model our data in a way that accounts for the use of different strategies. One way to do this would be to create a model that classifies each individual as a user of one of these three strategies, then models our parameters of interest only for those individuals who are classified as *averaging* responders (i.e., we're confident they're doing the task as instructed). This should give us tighter estimates for our effects of interest: they won't be inflated by responders who only focus on the reward-signalling info or diluted by guessers.
+
+This week, I've run a preliminary version of this modelling which classifies the sample's responses based strategy and then estimates how parameters change across task conditions within each strategy. A crucial point here is that this model does **not** restrict its estimation of parameters within a given strategy to data from participants classified as users of that strategy; instead, it weights the contribution of each trial to the posterior likelihood based on its confidence that the trial was generated by a certain strategy. To give an example, a trial with 179° of response bias would contribute meaningfully to the posterior likelihood for Strategy 3 (guessing), as it shouldn't arise under Strategies 1 (averaging) and 2 (response to colour).
+
+To be clear, this is a pilot run! The full model I've been discussing with Christin will require a bit of time to work on (it needs a model for each strategy to be fit to the full data so that we get pseudopriors for use in the model selection process). I mostly wanted to see if this model would converge well and clearly differentiate between the different strategies. I also wanted to check that in the Averaging strategy, the model recovers the *differences* between conditions which are of interest to us. Because of the way this model is set up, the posterior estimates by condition will be much less precise, so don't worry too much about (e.g.) differences from 0 in the response bias estimates on this pass.
+
+## The model
+
+### What are we modelling?
+
+Here, we're modelling response bias on all trials except dual-colour ones. This represents a combination of *core* trials, which made up the majority of the task (90%; 432/480 trials) with a 2 x 2 design (2 reward levels: low, high; 2 motion coherence levels: 20%, 40%), and *catch* trials (5%; 24/480 trials), which had a higher motion coherence level (60%). In effect, this means our model has a 2 x 3 structure (2 reward levels x 3 coherence levels).
+
+In this model, we're including ALL the data we've got (including participants whose entire datasets were excluded for high rates of guessing in previous analyses). In theory, this model handles guessers fine because it's able to identify them as users of a particular response strategy. We also want to check that the model flags the same participants as our previous exclusion criterion did, and to take a look at any discrepancies between the two approaches.
+
+### Generating process: three-strategy mixture
+
+This model implements a hierarchical Bayesian mixture to describe how participants perform a circular response task. It assumes that every response is generated by one of three latent strategies, with the overall prevalence of these strategies controlled by a group-level mixing probability.
+
+-   *Strategy 1: Averaging*
+
+    -   The participant attempts to average the motion directions for the two stimuli.
+
+    -   Model: A von Mises distribution where the model estimates the mean bias (μA​) and precision (κA). Includes a 'sub-mixture' where a certain proportion of trials (θA​) are random guesses.
+
+-   *Strategy 2: Colour-driven response*
+
+    -   The participant ignores the average and responds specifically to the coloured motion direction.
+
+    -   Model: A von Mises distribution where the mean is fixed to the coloured stimulus location, but precision (κB​) is estimated. Also includes a 'sub-mixture' for random guesses (θB​). I've chosen to fix the mean for this strategy to reduce identifiability issues due to label switching (e.g., allowing mean to vary could produce a lot of confusion for the model about whether a particular response was a very biased attempt at averaging or a slightly noisy report of the reward-signalling motion direction).
+
+-   *Strategy 3: Random guessing*
+
+    -   The participant is not engaging with the stimuli at all across the entire task; distinct from the occasional guesses subsumed within the other two strategies.
+
+    -   Model: A uniform distribution across the circle (−π to π).
+
+The likelihood for a single response y is defined as:
+
+p(y) = π1​\[Strategy A\] + π2​\[Strategy B\] + π3​\[Strategy C\]
+
+### What can this model do? What can't it do?
+
+This model is a quick(...ish) and dirty trial run of the idea that we can confidently classify people by strategy. It works off the idea that everyone uses all three strategies in some ratio, and therefore keeps things simple by specifying a single mixture of the three strategies for the whole sample (i.e., the group averaged the directions x% of the time, reported reward-signalling motion direction y% of the time, and guessed z% of the time).
+
+We can then use this group-level ratio as a prior to assess which strategy each individual was using by calculating the likelihood of observing their data under each response strategy. Even with a single group-level ratio, the model can still confidently flag a specific participant as a specific type of responder because their individual data are simply too consistent to be explained any other way. What we want to see here is sensible *separation*: we don't want many participants to have even probability splits across strategies (e.g., lack of differentiation between Strategy 1 and Strategy 2, or either of those and Strategy 3), and we want the strategy they're classified into to match how their responses are distributed.
+
+Crucially, what we *can't* do with this model is implement the process that's our final goal: 1) classifying each individual as a particular type of responder, then 2) estimating our parameters of interest *only for* the individuals who were classified as using the strategy we wanted them to. In the current version, a single set of strategy weights applies to the entire population. This means the model cannot ‘filter out’ non‑averagers when estimating the parameters for Strategy 1; instead, the parameters for this strategy are influenced by data from everyone, weighted by the group‑level strategy probability rather than by individual behaviour. Therefore, model estimates of Strategy 1 parameters do get polluted to some degree by data from users of the other strategies, as it's not 'sorting' data into the correct buckets while it's still learning.
+
+One consequence of this is wider confidence intervals on the location of each individual posterior estimate, affecting our ability to answer questions like whether response bias differs significantly from 0. However, it does OK at preserving *relative* patterns of performance (i.e., it preserves consistent shifts across task conditions), so we can still see differences between posterior estimates quite confidently.
+
+## Evaluating the model
+
+### Does the model fit?
+
+First, let's visually inspect how the model is fitting relative to the observed data.
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+##### Filtering participants #####
+
+trial_exclusions <- core %>%
+  count(id) %>%
+  mutate(droprate = 1-(n / 432))
+
+exclusion_drops <- trial_exclusions %>%
+  filter(droprate > 0.2) %>%
+  pull(id)
+
+rayleigh_results <- core %>%
+  group_by(id) %>%
+  summarise(
+    n = n(),
+    rayleigh_p = tryCatch({
+      rayleigh.test(circular(valuebias_rad))$p.value
+    }, error = function(e) NA),
+    rayleigh_stat = tryCatch({
+      rayleigh.test(circular(valuebias_rad))$statistic
+    }, error = function(e) NA),
+    .groups = "drop"
+  )
+
+rayleigh_drops <- rayleigh_results %>%
+  filter(rayleigh_p > 0.05) %>%
+  pull(id)
+
+drops <- union(exclusion_drops, rayleigh_drops)
+
+fit <- readRDS("model_strategies_fullsample.rds")
+
+y_rep <- fit$draws("y_rep_mix", format = "matrix")
+y_real <- as.vector(combo$valuebias_rad)
+
+# 1. Ensure levels are in a logical order for the facets
+# This prevents R from ordering them alphabetically (e.g., '1' then '10' then '2')
+facet_levels <- c(
+  "Val: lo | Coh: 0.2", "Val: hi | Coh: 0.2",
+  "Val: lo | Coh: 0.4", "Val: hi | Coh: 0.4",
+  "Val: lo | Coh: 0.6", "Val: hi | Coh: 0.6"
+)
+
+group_interaction <- factor(
+  paste0("Val: ", combo$trialval, " | Coh: ", combo$coherence),
+  levels = facet_levels
+)
+
+# 2. Re-wrap and convert y_rep (Beast Mode draws can be large!)
+# We sample 50-100 draws; any more and the plot becomes a solid blob.
+set.seed(42)
+draws_to_plot <- sample(nrow(y_rep), 100)
+y_rep_subset <- y_rep[draws_to_plot, ]
+
+# Circular wrap and convert to degrees
+y_rep_deg <- atan2(sin(y_rep_subset), cos(y_rep_subset)) * 180/pi
+y_obs_deg <- y_real * 180/pi # Assuming Y is your original vector in radians
+
+# 3. Execute the Faceted PPC
+ppc_dens_overlay_grouped(
+  y = y_obs_deg,
+  yrep = y_rep_deg,
+  group = group_interaction
+) +
+  # Customizing the look for a professional paper-ready finish
+  facet_wrap(~ group, nrow = 3, ncol = 2) + 
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red", alpha = 0.6) +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Faceted Posterior Predictive Check",
+    subtitle = "Checking Strategy Mixture Fit across 3x2 Factorial Conditions",
+    x = "Error (Degrees)",
+    y = "Density",
+    caption = "Black line: Observed Data | Blue lines: 100 Simulated Draws from Posterior"
+  ) +
+  theme(
+    strip.background = element_rect(fill = "grey90", color = NA),
+    strip.text = element_text(face = "bold", size = 9),
+    panel.grid.minor = element_blank()
+  )
+```
+
+This is the best fit we've seen yet. The only issue is that the model is shifting the peaks of the distribution rightwards; this is due to the fact that a certain percentage of trials in each draw are guaranteed to come from the distribution focused on the reward-signalling motion direction, rather than the average.
+
+### Strategy classification
+
+Recalling that the model specifies one group-level mixture of response strategies in the data, let's have a look at that.
+
+```{r}
+
+
+pi_samples <- fit$draws("pi_strategy", format = "draws_df")
+
+pi_summary <- pi_samples %>%
+  select(starts_with("pi_strategy")) %>%
+  pivot_longer(cols = everything(), 
+               names_to = "strategy_index", 
+               values_to = "probability") %>%
+  mutate(strategy_name = case_when(
+    strategy_index == "pi_strategy[1]" ~ "Averaging",
+    strategy_index == "pi_strategy[2]" ~ "Reporting Colour",
+    strategy_index == "pi_strategy[3]" ~ "Guessing"
+  )) %>%
+  group_by(strategy_name) %>%
+  summarise(
+    mean_prob = mean(probability),
+    lower_95 = quantile(probability, 0.025),
+    upper_95 = quantile(probability, 0.975)
+  )
+
+# 3. Print the results for your team
+print(pi_summary)
+
+# 4. Visualization
+# 2. Plot with matching visual language
+ggplot(pi_summary, aes(x = strategy_name, y = mean_prob, fill = strategy_name)) +
+  geom_col(width = 0.7, color = "black", linewidth = 0.5) +
+  geom_errorbar(aes(ymin = lower_95, ymax = upper_95), 
+                width = 0.1, linewidth = 0.8) +
+  scale_fill_manual(values = c(
+    "Averaging" = "purple",    # Matches your 'Lo' blue
+    "Reporting Colour" = "#ff6117", # Matches your 'Hi' orange
+    "Guessing" = "#888888"      # Neutral gray for noise
+  )) +
+  labs(
+    y = "Group Prevalence (Probability)", 
+    x = "", 
+    title = "Latent Strategy Mixture"
+  ) +
+  # Customizing the theme to match your Roboto Condensed / Minimal style
+  theme_minimal(base_size = 14, base_family = "RobotoCondensed") +
+  theme(
+    panel.grid = element_blank(), 
+    axis.line = element_line(color = "black"), 
+    axis.ticks = element_line(color = "black"),
+    legend.position = "none" # Categories are on x-axis, legend is redundant
+  )
+
+```
+
+So at the group level, NOT doing any kind of splitting by participants, the model thinks that about 70% of responses are averaging, 20% are guesses, and 10% are from reporting the reward-signalling motion direction.
+
+Now, let's have a look at how the model classifies each participant.
+
+```{r}
+
+strat_probs <- fit$summary("strategy_prob", mean) %>%
+  mutate(
+    stan_id = rep(1:stan_data$N_subj, times = 3),
+    strategy = rep(c("1: Averaging", "2: Reporting Colour", "3: Guessing"), each = stan_data$N_subj)
+  ) %>%
+  select(stan_id, strategy, mean) %>%
+  pivot_wider(names_from = strategy, values_from = mean)
+
+# View the top of the table
+print(head(strat_probs))
+
+# --- 2. STRATEGY HEATMAP ---
+# Visualizing the distribution of strategies across the whole cohort
+library(tidyverse)
+
+ggplot(strat_probs %>% pivot_longer(-stan_id, names_to = "Strategy", values_to = "Prob"), 
+       aes(x = Strategy, y = factor(stan_id), fill = Prob)) +
+  geom_tile(color = "black", size = 0.025) + # Added thin white borders for a "grid" look
+  # White to Navy Gradient
+  scale_fill_gradient(low = "#eeeeee", high = "#000080", limits = c(0, 1)) + 
+  theme_minimal() +
+  labs(title = "Strategy Classification Heatmap",
+       x = "Strategy Type", y = "Subject ID", fill = "Probability") +
+  theme(
+    axis.text.y = element_text(size = 6),
+    panel.grid = element_blank(), # Removes grid lines behind tiles
+    legend.position = "right",
+    plot.title = element_text(face = "bold"),
+    axis.title = element_text(face = "bold")
+  )
+```
+
+This looks pretty good to me! A few points of interest:
+
+-   The model clearly differentiates between Strategies 1 and 2; there are no cases where it is torn on placing a participant in one of these strategy groups.
+
+-   Even though Strategy 2 is still defined in quite a limited way (it fixes the expected response to the reward-signalling motion direction rather than allowing for variation across conditions), some participants are confidently classified as being part of this strategy. These participants almost perfectly match those in the cluster of outsize response biases visible in the raw data.
+
+-   The people who the model confidently classifies as guessers (Strategy 3) perfectly matches what we get from application of our previous exclusion criterion, also capturing one other person who barely fell outside the bounds of that criterion.
+
+-   As you'd expect, the only cases where the model struggles to classify people are when it becomes torn between Strategies 1 and 3. This happens when people have a borderline level of response precision: they're doing poorly enough that there's a chance they're always guessing, but there is some weak signal coming through from the noise.
+
+Let's have a look at some examples of the model's classification. First up, let's look at a participant who was classified as an averager.
+
+```{r}
+
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+strat_probs <- fit$summary("strategy_prob", mean) %>%
+  mutate(
+    stan_id = rep(1:stan_data$N_subj, times = 3),
+    strategy = rep(c("A: Averaging", "B: Color", "C: Guessing"), each = stan_data$N_subj)
+  ) %>%
+  select(stan_id, strategy, mean) %>%
+  pivot_wider(names_from = strategy, values_from = mean)
+
+check_subject_ppc <- function(target_id, data_list, obs_deg, interaction_vec, strat_probs) {
+  
+  # 1. Slice indexing for this specific subject
+  start <- data_list$start_idx[target_id]
+  end   <- data_list$end_idx[target_id]
+  idx   <- start:end
+  
+  # 2. Create a clean dataframe for plotting
+  df_sub <- data.frame(
+    error = obs_deg[idx],
+    condition = interaction_vec[idx]
+  )
+  
+  # 3. Get strategy probabilities for the subtitle
+  # Assumes 'stan_id' matches 'target_id'
+  probs <- strat_probs %>% filter(stan_id == target_id)
+  strat_text <- sprintf("Averaging: %.2f | Reporting colour: %.2f | Guessing: %.2f", 
+                        probs$`A: Averaging`, probs$`B: Color`, probs$`C: Guessing`)
+  
+  # 4. Plot Observed Density only
+  ggplot(df_sub, aes(x = error, fill='grey')) +
+    # The 'after_stat(count)' or just standard density
+    geom_density(alpha = 0.4, color = "black", linewidth = 0.3) +
+    # Red dashed line at 0 (Perfect Averaging)
+    geom_vline(xintercept = 0, linetype = "dashed", color = "red", alpha = 0.6) +
+    facet_wrap(~ condition, nrow = 3, ncol = 2) +
+    # Zoom into the circle (usually -180 to 180)
+    coord_cartesian(xlim = c(-180, 180)) +
+    labs(
+      title = paste("Response Distribution | Subject ID:", target_id),
+      subtitle = strat_text,
+      x = "Response Error (Degrees)",
+      y = "Density",
+      fill = "Condition"
+    ) +
+    theme_minimal(base_family = "RobotoCondensed") +
+    theme(
+      panel.grid.minor = element_blank(),
+      strip.text = element_text(size = 8, face = "bold"),
+      legend.position = "none", # Conditions are already in facets
+      axis.line = element_line(color = "black")
+    )
+}
+
+check_subject_ppc(
+  target_id = 22, 
+  data_list = stan_data, # The list you sent to Stan
+  obs_deg = stan_data$Y*180/pi, 
+  interaction_vec = group_interaction, 
+  strat_probs = strat_probs
+)
+
+```
+
+You can see that even though the patterns in the participant's data are not 100% clean, the response peaks are mostly centred at or near 0.
+
+Now here's someone who was classified as a reporter of the reward-signalling motion direction.
+
+```{r}
+
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+check_subject_ppc(
+  target_id = 43, 
+  data_list = stan_data, # The list you sent to Stan
+  obs_deg = stan_data$Y*180/pi, 
+  interaction_vec = group_interaction, 
+  strat_probs = strat_probs
+)
+```
+
+Here, the peak (and indeed the bulk of the distribution in most cases) is centred right of 0, indicating that little attempt at averaging has been made.
+
+Here's someone who's been classified as a pure guesser:
+
+```{r}
+
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+check_subject_ppc(
+  target_id = 34, 
+  data_list = stan_data, # The list you sent to Stan
+  obs_deg = stan_data$Y*180/pi, 
+  interaction_vec = group_interaction, 
+  strat_probs = strat_probs
+)
+
+```
+
+And finally, let's look at both the cases where the model struggles to determine if someone is averaging or guessing. These are clearly 'borderline' cases where they're doing badly at the task but there is some hint of non-random responding in at least a couple of conditions.
+
+```{r}
+
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+check_subject_ppc(
+  target_id = 18, 
+  data_list = stan_data, # The list you sent to Stan
+  obs_deg = stan_data$Y*180/pi, 
+  interaction_vec = group_interaction, 
+  strat_probs = strat_probs
+)
+
+check_subject_ppc(
+  target_id = 31, 
+  data_list = stan_data, # The list you sent to Stan
+  obs_deg = stan_data$Y*180/pi, 
+  interaction_vec = group_interaction, 
+  strat_probs = strat_probs
+)
+
+```
+
+### Model estimates for averaging strategy
+
+Now, let's look at how performance changes across task conditiosn within our strategy of interest (averaging).
+
+First let's see how the model has estimated *mu* (mean) in each reward x coherence condition.
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+draws_A <- fit %>%
+  spread_draws(b_mu_A[index], b_kappa_A[index], b_theta_A[index]) %>%
+  pivot_wider(names_from = index, 
+              names_glue = "{.value}_{index}", 
+              values_from = c(b_mu_A, b_kappa_A, b_theta_A))
+
+# --- 2. CALCULATE MARGINAL MEANS & DIFFERENCES ---
+# We perform the math within mutate to get the condition-level estimates
+# and the "Value Effect" (High - Low) simultaneously.
+post_processed <- draws_A %>%
+  mutate(
+    # --- KAPPA (Precision) ---
+    ka_hi_low = 50 * plogis(b_kappa_A_1),
+    ka_lo_low = 50 * plogis(b_kappa_A_1 + b_kappa_A_2),
+    ka_hi_04  = 50 * plogis(b_kappa_A_1 + b_kappa_A_3),
+    ka_lo_04  = 50 * plogis(b_kappa_A_1 + b_kappa_A_2 + b_kappa_A_3 + b_kappa_A_5),
+    ka_hi_06  = 50 * plogis(b_kappa_A_1 + b_kappa_A_4),
+    ka_lo_06  = 50 * plogis(b_kappa_A_1 + b_kappa_A_2 + b_kappa_A_4 + b_kappa_A_6),
+    
+    # --- THETA (Lapse Rate) ---
+    th_hi_low = plogis(b_theta_A_1),
+    th_lo_low = plogis(b_theta_A_1 + b_theta_A_2),
+    th_hi_04  = plogis(b_theta_A_1 + b_theta_A_3),
+    th_lo_04  = plogis(b_theta_A_1 + b_theta_A_2 + b_theta_A_3 + b_theta_A_5),
+    th_hi_06  = plogis(b_theta_A_1 + b_theta_A_4),
+    th_lo_06  = plogis(b_theta_A_1 + b_theta_A_2 + b_theta_A_4 + b_theta_A_6),
+    
+    # --- NEW: MU MARGINALS (The missing piece!) ---
+    mu_hi_low = b_mu_A_1,
+    mu_lo_low = b_mu_A_1 + b_mu_A_2,
+    mu_hi_04  = b_mu_A_1 + b_mu_A_3,
+    mu_lo_04  = b_mu_A_1 + b_mu_A_2 + b_mu_A_3 + b_mu_A_5,
+    mu_hi_06  = b_mu_A_1 + b_mu_A_4,
+    mu_lo_06  = b_mu_A_1 + b_mu_A_2 + b_mu_A_4 + b_mu_A_6,
+    
+    # --- VALUE EFFECTS (Keep these for your diff plots) ---
+    diff_ka_low = ka_hi_low - ka_lo_low,
+    diff_ka_04  = ka_hi_04 - ka_lo_04,
+    diff_ka_06  = ka_hi_06 - ka_lo_06,
+    
+    diff_mu_low = mu_hi_low - mu_lo_low,
+    diff_mu_04  = mu_hi_04 - mu_lo_04,
+    diff_mu_06  = mu_hi_06 - mu_lo_06,
+    
+    diff_th_low = th_hi_low - th_lo_low,
+    diff_th_04  = th_hi_04 - th_lo_04,
+    diff_th_06  = th_hi_06 - th_lo_06
+  )
+
+marginal_estimates <- post_processed %>%
+  select(.draw, starts_with("ka_"), starts_with("th_"), starts_with("mu_")) %>%
+  # Filter out the 'diff' columns to focus on raw estimates
+  select(-starts_with("diff_")) %>%
+  pivot_longer(-.draw, names_to = "Parameter_Cond", values_to = "Value") %>%
+  separate(Parameter_Cond, into = c("Param", "Reward", "Coherence"), sep = "_") %>%
+  mutate(
+    Reward = recode(Reward, "hi" = "High Value", "lo" = "Low Value"),
+    Coherence = recode(Coherence, "low" = "Low (0.2)", "04" = "0.4", "06" = "0.6")
+  )
+
+# --- STEP 1: Ensure the labels are exactly what the plot expects ---
+# This re-aligns the 'mu' labels to match 'ka' and 'th'
+marginal_estimates <- marginal_estimates %>%
+  mutate(
+    # If Param is 'mu_hi' or 'mu_lo', simplify it to just 'mu'
+    # and ensure Reward is correctly set
+    Reward = case_when(
+      Param == "mu_hi" ~ "High Value",
+      Param == "mu_lo" ~ "Low Value",
+      TRUE ~ Reward
+    ),
+    Param = case_when(
+      Param %in% c("mu_hi", "mu_lo") ~ "mu",
+      TRUE ~ Param
+    )
+  )
+
+plot_mirrored_nudged <- function(data, param_name, title, xlab) {
+  
+  plot_data <- data %>% filter(Param == param_name)
+  
+  ggplot(plot_data, aes(x = Value, y = Coherence, fill = Reward, color = Reward)) +
+    # 1. THE SLAB (Density)
+    stat_halfeye(
+      aes(side = ifelse(Reward == "High Value", "top", "bottom")),
+      scale = 0.6, 
+      alpha = 0.7,
+      interval_color = NA, 
+      point_color = NA
+    ) +
+    # 2. THE INTERVAL (Point and Whiskers)
+    # We manually shift the 'y' coordinate based on the Reward level
+    stat_pointinterval(
+      aes(y = as.numeric(factor(Coherence)) + ifelse(Reward == "High Value", 0.08, -0.08)),
+      .width = c(0.66, 0.95),
+      linewidth = 2,
+      point_size = 3
+    ) +
+    scale_fill_manual(values = c("High Value" = "#ff6117", "Low Value" = "#009dff")) +
+    scale_color_manual(values = c("High Value" = "#ff6117", "Low Value" = "#009dff")) +
+    theme_minimal() +
+    labs(title = title, x = xlab, y = "Coherence") +
+    theme(
+      legend.position = "none",
+      panel.grid.major.y = element_line(color = "grey90", linetype = "dashed")
+    )
+}
+
+# --- RE-GENERATE ---
+p_mu_mir   <- plot_mirrored_nudged(marginal_estimates, "mu", "Bias (Mu)", "Radians") +
+  geom_vline(xintercept = 0, linetype = "dotted", alpha = 0.5)
+
+p_ka_mir   <- plot_mirrored_nudged(marginal_estimates, "ka", "Precision (Kappa)", "Kappa")
+
+p_th_mir   <- plot_mirrored_nudged(marginal_estimates, "th", "Lapse Rate (Theta)", "Probability")
+
+# Combine
+(p_mu_mir | p_ka_mir | p_th_mir) + 
+  plot_layout(guides = "collect") +
+  plot_annotation(title = "Strategy A: Parameter Estimates")
+
+sum(post_processed$mu_hi_low > post_processed$mu_lo_low) / nrow(post_processed)
+
+```
+
+OK, this is looking pretty scary because suddenly the error bars are massive! As discussed previously, this is because the model didn't strictly separate its parameter estimation by who was using which strategy, so there is a huge amount of noise variance added to these estimates. Don't worry too much about this... instead, we care about the pattern of performance *across* conditions.
+
+```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
+
+make_diff_plot <- function(df, prefix, title, xlab, palette) {
+  df %>%
+    select(.draw, starts_with(prefix)) %>%
+    pivot_longer(-.draw, names_to = "Coherence", values_to = "Diff") %>%
+    mutate(Coherence = factor(Coherence, 
+                              levels = c(paste0(prefix, "_low"), paste0(prefix, "_04"), paste0(prefix, "_06")),
+                              labels = c("0.2", "0.4", "0.6"))) %>%
+    ggplot(aes(x = Diff, y = Coherence, fill = Coherence)) +
+    geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
+    stat_halfeye() +
+    scale_fill_brewer(palette = palette) +
+    theme_minimal() +
+    labs(title = title, x = xlab, y = "Coherence") +
+    theme(legend.position = "none")
+}
+
+p_mu <- make_diff_plot(post_processed, "diff_mu", "Value Effect on Bias", "∆ Bias (High - Low Reward)", "PuOr")
+p_ka <- make_diff_plot(post_processed, "diff_ka", "Value Effect on Precision", "∆ Kappa (High - Low Reward)", "Greens")
+p_th <- make_diff_plot(post_processed, "diff_th", "Value Effect on Guessing", "∆ Guess % (High - Low Reward)", "RdYlGn")
+
+# Display the "Big Three"
+(p_mu | p_ka | p_th)
+
+```
+
+For reasons discussed above we can still recover *differences* between effects OK, and these match what we've seen from previous models:
+
+-   There is a reward-related response bias in the low-coherence (20%) condition only
+
+-   Now that we have implemented a mixture model, reward no longer influences response concentration
+
+-   Instead, we now see an effect on *guess rate*: for mid-coherence (40%) trials, people guess more on low-value trials than high-value ones
+
+## Takeaways
+
+Obviously, this implementation of the model is not perfect, nor is it a final product! However, as a first pass, it offers us some useful insights:
+
+-   Our three strategies are distinct enough that we're unlikely to run into major issues with identifiability (label switching) when fitting the model
+
+-   The model appears to describe and recover these strategies pretty well in the datasets of individuals
+
+-   Although there's a lot of error in the estimates for the averaging strategy due to the way the model is set up, it correctly recovers the differences between conditions that we've been seeing so far
+
+Pending your thoughts on this, I think we have good grounds for moving on to a full product space method fit! This would be the final version of the model that implements our desired approach: 1) fit all the participants with each model and use those fits for pseudopriors, then 2) run a model which actually categorises *individuals* based on strategy, then uses only the individuals in the 'averaging' category to inform its estimates of how response bias, precision, and guess rate change across task conditions.
