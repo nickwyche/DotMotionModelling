@@ -21,7 +21,9 @@ execute:
 
 *Core* trials made up the majority (90%; 432/480 trials) of the task. They're what we've discussed in meetings so far: participants saw an equal number of trials from each cell of our 2 x 2 design (2 reward levels: low, high; 2 coherence levels: 20%, 40%).
 
-Writeup to come. Note: accidentally didn't exclude guessers, but in a way this is good as model still fits well (would just assign them a high guessing probability).
+Here, we do a mixture model: we assume that for some percentage of trials, each responder is making a genuine effort at the task, but for others, they are guessing at random. This modelling approach estimates the proportion of trials which fall into each of these categories, then estimates our parameters of interest (value bias, precision) only for the distribution of 'genuine effort' trials.
+
+On this run I left in the people who we usually exclude as frequent guessers, to see if the model still fits well (by assigning them a high guessing probability).
 
 ### Does the model fit?
 
@@ -145,7 +147,10 @@ ppc_dens_overlay_grouped(
 Overall, model fit is looking much better than for the simpler non-mixture version (circular response distribution with dispersion.
 
 ```{r}
-
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
 
 y_rep <- posterior_predict(
   fit_combo_dist, 
@@ -165,8 +170,7 @@ ppc_dens_overlay_grouped(
   theme_minimal() +
   labs(
     title = "Posterior Predictive Check by Condition",
-    subtitle = "Comparing observed data to model simulations (Valid Participants Only)",
-    x = "Value Bias (degrees)",
+    x = "Value bias (°)",
     y = "Density"
   ) +
   facet_wrap(~ group, ncol = 2) +
@@ -217,38 +221,32 @@ ggplot(zero_test_summary_mix, aes(x = trialval, y = median_deg, color = trialval
   facet_wrap(~ coherence, labeller = label_both) +
   scale_color_manual(values = c("hi" = "#ff6117", "lo" = "#009dff")) +
   labs(
-    title = "Clean Reward Bias (Mixture Model Component: mu1)",
-    subtitle = "Noise-filtered bias estimates | Error bars: 95% CIs",
-    x = "Trial Reward",
-    y = "Bias (Degrees)",
+    title = "Value bias (mu) for non-guess responses",
+    x = "Trial reward",
+    y = "Value bias (°)",
     color = "Reward Level"
   ) +
   theme_minimal(base_size = 14) +
   theme(panel.grid.minor = element_blank(),
-        strip.text = element_text(face = "bold"))
+        strip.text = element_text(face = "bold"),
+        legend.position = 'none')
 
 zero_test_summary_mix %>%
   select(trialval, coherence, median_deg, lower_95_deg, upper_95_deg, pd) %>%
   knitr::kable(
-    caption = "Task-Directed Bias (mu1) by Condition (Degrees)",
-    col.names = c("Reward", "Coherence", "Median Bias", "95% Lower", "95% Upper", "P-Direction"),
+    caption = "Value bisa yb condition",
+    col.names = c("Reward", "Coherence", "Median Bias", "95% Lower", "95% Upper", "P-Directional"),
     align = "lccccc"
   ) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
 
 ```
 
-Takeaways:
-
--   When coherence is *low* (20%), there is a credible response bias for high-value trials but not low-value ones
-
--   When coherence is *medium* (40%), there is a credible (but small) response bias for both high and low-value trials.
-
--   When coherence is *high* (60%), there is no longer a response bias for high-value trials. Conversely, the response bias for low-value trials persists.
+Across all value x coherence combinations, there is a credible response bias. However, the 'odd one out' condition is low coherence/high reward, where the bias is substantially larger than for other conditions.
 
 ### How does bias change with coherence and reward?
 
-The nice thing about this modelling approach is that we can see the posterior distributions for *differences* in response bias across levels of coherence and reward (i.e., the range of plausible values for how much the response has actually shifted). In these graphs, the plotted point is the median difference and the whiskers are the 66% (thick) and 95% (thin) credible intervals.
+Here, we check the posterior distributions for *differences* in response bias across levels of coherence and reward (i.e., the range of plausible values for how much the response has actually shifted). In these graphs, the plotted point is the median difference and the whiskers are the 66% (thick) and 95% (thin) credible intervals.
 
 #### Effect of coherence
 
@@ -285,7 +283,7 @@ coherence_effects_mix <- all_draws_mix %>%
   )
 
 # 2. This should now be 4000 and 4000 (or whatever your ndraws is)
-print(table(coherence_effects_mix$reward_group))
+# print(table(coherence_effects_mix$reward_group))
 
 # 3. Plot
 ggplot(coherence_effects_mix, aes(x = diff_deg, y = reward_group, fill = reward_group)) +
@@ -293,9 +291,8 @@ ggplot(coherence_effects_mix, aes(x = diff_deg, y = reward_group, fill = reward_
   geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
   scale_fill_manual(values = c("High Reward" = "#ff6117", "Low Reward" = "#009dff")) +
   labs(
-    title = "Corrected: Coherence Effect within Reward Levels",
-    subtitle = "Comparing Bias at 0.2 vs 0.4 Coherence",
-    x = "Bias Difference (Degrees)",
+    title = "Effect of coherence upon value bias (within reward levels)",
+    x = "Value bias difference (low - high coherence)",
     y = ""
   ) +
   theme_minimal()
@@ -316,7 +313,7 @@ coherence_diff_summary_mix %>%
   mutate(across(where(is.numeric), ~ round(., 3))) %>%
   knitr::kable(
     format = "html",
-    caption = "Mixture Model: Change in task-directed bias (mu1) across coherence",
+    caption = "Change in value bias across coherence levels",
     col.names = c("Condition Contrast", "Median Diff", "Lower 95%", "Upper 95%", "P-Direction"),
     align = "lcccc"
   ) %>%
@@ -324,7 +321,7 @@ coherence_diff_summary_mix %>%
 
 ```
 
-Takeaways:
+Value bias decreases with increasing coherence in the high-reward condition only; there's no meaningful difference across coherence levels for low-reward trials, as in neither case is there that much of a bias to start with.
 
 #### Effect of reward
 
@@ -360,9 +357,8 @@ ggplot(reward_effect_clean, aes(x = diff_deg, y = coherence_level, fill = cohere
   geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
   scale_fill_manual(values = c("Low Coherence (0.2)" = "#807dba", "High Coherence (0.4)" = "#bcbddc")) +
   labs(
-    title = "Reward Effect on Task-Directed Bias (mu1)",
-    subtitle = "Posterior of (High Reward - Low Reward) | Positive = Increased Bias",
-    x = "Difference in Bias (Degrees)",
+    title = "Effect of reward upon value bias (within coherence levels)",
+    x = "Value bias difference (high - low reward)",
     y = ""
   ) +
   theme_minimal(base_size = 14) +
@@ -387,7 +383,7 @@ reward_diff_summary_mix %>%
   mutate(across(where(is.numeric), ~ round(., 2))) %>%
   knitr::kable(
     format = "html",
-    caption = "<b>Mixture Model: Reward-Induced Bias Shift (mu1)</b><br>Values represent High Reward minus Low Reward in degrees.",
+    caption = "Change in value bias across reward levels (high - low)",
     col.names = c("Coherence Level", "Median Diff", "95% Lower", "95% Upper", "P-Direction"),
     align = "lcccc"
   ) %>%
@@ -398,9 +394,7 @@ reward_diff_summary_mix %>%
   )
 ```
 
-Takeaways:
-
--   
+Value bias is greater in the high-reward condition than the low-reward one, only when coherence is low.
 
 ### Does response precision change across trial types?
 
@@ -443,9 +437,7 @@ ggplot(precision_estimates_mix, aes(x = actual_kappa, y = coherence, fill = tria
     "0.4" = "High (0.4)"
   )) +
   labs(
-    title = "Mixture Model: Task-Directed Precision (Kappa1)",
-    subtitle = "Higher values indicate more precise (sharper) responses",
-    x = "Concentration parameter (kappa1)",
+    x = "Concentration parameter (kappa) for non-guess responses",
     y = "Coherence",
     fill = "Reward"
   ) +
@@ -472,8 +464,8 @@ precision_summary_mix %>%
   mutate(across(where(is.numeric), ~ round(., 3))) %>%
   knitr::kable(
     format = "html",
-    caption = "Task-directed precision (kappa1) by condition",
-    col.names = c("Coherence", "Reward", "Median Kappa", "95% Lower", "95% Upper"),
+    caption = "Response precision (kappa) by condition",
+    col.names = c("Coherence", "Reward", "Median", "95% Lower", "95% Upper"),
     align = "llccc"
   ) %>%
   kableExtra::kable_styling(
@@ -486,11 +478,11 @@ precision_summary_mix %>%
 
 ```
 
-I won't do the full set of pairwise contrasts here as we don't care about most of them. As expected, there's a clear effect of coherence upon kappa (high-coherence trials produce a less dispersed distribution of responses).
+As expected, there's a clear effect of coherence upon kappa (high-coherence trials produce a less dispersed distribution of responses); I won't do contrasts for this as it's pretty obvious.
 
-Note also that the model has found it harder to estimate precision for the catch (60% coherence) trials. This may be due to the lower amount of data available, but looking at the posteriors for 40% coherence trials, it could also be due to identifiability issues when estimating *kappa* for tighter distributions (i.e., once a distribution is already 'spiked,' even massive increases in *kappa* result in almost no visible change to the response spread).
+Note also that with guesses filtered out, the model has found it even harder to estimate precision for the higher-coherence trials. This is another instance of identifiability issues when estimating *kappa* for tighter distributions (i.e., once a distribution is already 'spiked,' even massive increases in *kappa* result in almost no visible change to the response spread).
 
-However, a key question remains: within each level of coherence, is responding less precise for low-reward trials? In other words, are people making less of an effort when they aren't going to win big?
+Within each level of coherence, is responding less precise for low-reward trials? In other words, are people making less of an effort when they aren't going to win big?
 
 ```{r}
 #| echo: false      # Prevents the code itself from appearing in the document
@@ -518,7 +510,7 @@ ggplot(kappa_diffs_mix, aes(x = actual_kappa, y = coherence, fill = coherence)) 
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
   scale_fill_brewer(palette = "Oranges") +
   scale_y_discrete(limits = c("0.4", "0.2")) + 
-  labs(title = "Reward Effect on Precision (kappa1)", x = "Difference in kappa (Hi - Lo)") +
+  labs(title = "Change in precision across reward levels", x = "Difference in kappa (high - low reward)") +
   theme_minimal()
 
 # 3. Re-run the summary table
@@ -538,13 +530,17 @@ kappa_diff_summary_mix %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover"))
 ```
 
-So yes: while there's no difference in response precision for low-coherence trials, it does appear that people are trying less hard for low-reward trials when coherence is higher.
+There's no effect when coherence is low, but we get an effect in the *wrong* direction when coherence is high (i.e., people are more precise for low-value trials than high-value ones). I'll explain more about this below, but I attribute this to an interaction with guessing proportion.
 
 ### Guessing proportion
 
-Do people guess less on easier trials?
+Now, let's look the proportion of trials for which the model thinks people are guessing within each condition.
 
 ```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
 
 cell_guess_mix <- emmeans(fit_mixture_test, ~ trialval * coherence, dpar = "theta2") %>%
   gather_emmeans_draws() %>%
@@ -565,8 +561,8 @@ zero_test_guess_summary <- cell_guess_mix %>%
 zero_test_guess_summary %>%
   mutate(across(where(is.numeric), ~ round(., 3))) %>%
   knitr::kable(
-    caption = "Raw Guess Rate (theta2) by Condition (Probability)",
-    col.names = c("Reward", "Coherence", "Median Guess Rate", "95% Lower", "95% Upper", "P-Direction"),
+    caption = "Guessing probability by condition",
+    col.names = c("Reward", "Coherence", "Median", "95% Lower", "95% Upper", "P-Direction"),
     align = "lccccc"
   ) %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
@@ -577,17 +573,20 @@ ggplot(zero_test_guess_summary, aes(x = trialval, y = median_prob, color = trial
   facet_wrap(~ coherence, labeller = label_both) +
   scale_color_manual(values = c("hi" = "#ff6117", "lo" = "#009dff")) +
   labs(
-    title = "Guess Rate (theta2) by Condition",
-    subtitle = "Probability of random lapse | Error bars: 95% CIs",
+    title = "Guessing probability by condition",
     x = "Trial Reward",
-    y = "Guess Probability (0-1)"
+    y = "Guess probability (0-1)"
   ) +
   theme_minimal(base_size = 14)
 ```
 
-Effect of coherence on guess rates within each reward condition
+The posterior estimates don't support a difference in guessing rate across coherence levels for high-value trials, but it *does* find that for low-reward trials, people guess more for high-coherence than low-coherence trials.
 
 ```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
 
 # 1. Get raw cell probabilities (theta2)
 cell_probs_guess <- emmeans(fit_mixture_test, ~ trialval * coherence, dpar = "theta2") %>%
@@ -617,7 +616,7 @@ coherence_guess_summary %>%
   mutate(across(where(is.numeric), ~ round(., 4))) %>%
   knitr::kable(
     format = "html",
-    caption = "<b>Coherence Effect on Guess Rate (0.2 - 0.4)</b>",
+    caption = "Effect of coherence on guess rate",
     col.names = c("Reward Level", "Median Diff", "Lower 95%", "Upper 95%", "P(Increase)"),
     align = "lcccc"
   ) %>%
@@ -625,13 +624,15 @@ coherence_guess_summary %>%
 
 # 4. Visualization
 ggplot(coherence_guess_effects, aes(x = p, y = reward_group, fill = reward_group)) +
-  stat_halfeye(alpha = 0.8, .width = c(0.66, 0.95)) +
-  geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
-  scale_fill_manual(values = c("High Reward" = "#ff6117", "Low Reward" = "#009dff")) +
+  stat_halfeye(
+    point_interval = median_qi, 
+    .width = c(0.95), 
+    alpha = 0.8
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
   labs(
-    title = "Mixture Model: Coherence Effect on Guess Rate (theta2)",
-    subtitle = "Difference: (Guess Prob @ 0.2) - (Guess Prob @ 0.4)\nPositive values: Harder task led to more random guessing",
-    x = "Change in Guess Probability (Percentage Points)",
+    title = "Change in guess rate across coherence levels",
+    x = "Change in guess rate (high - low coherence)",
     y = ""
   ) +
   theme_minimal(base_size = 14) +
@@ -639,9 +640,13 @@ ggplot(coherence_guess_effects, aes(x = p, y = reward_group, fill = reward_group
 
 ```
 
-Effect of reward on guess rates within each coherence level
+When coherence is low, the model doesn't find support for a difference in guessing rates based on trial reward. However, when coherence is high, it finds that people guess more often on low-value trials than high-value ones.
 
 ```{r}
+#| echo: false      # Prevents the code itself from appearing in the document
+#| message: false   # Prevents package loading messages and brms/Stan progress
+#| warning: false   # Prevents warning messages
+#| error: false     # Prevents error messages from printing
 
 # 1. Get the Reward Effect (Hi - Lo) safely within each Coherence level
 reward_guess_effects <- cell_guess_mix %>%
@@ -669,7 +674,7 @@ reward_guess_summary %>%
   mutate(across(where(is.numeric), ~ round(., 4))) %>%
   knitr::kable(
     format = "html",
-    caption = "<b>Reward Effect on Guess Rate (Hi - Lo Probability)</b>",
+    caption = "Effect of reward on guess rate",
     col.names = c("Coherence Level", "Median Diff", "Lower 95%", "Upper 95%", "P(Hi < Lo)"),
     align = "lcccc"
   ) %>%
@@ -681,12 +686,29 @@ ggplot(reward_guess_effects, aes(x = prob_guess, y = coherence_level, fill = coh
   geom_vline(xintercept = 0, linetype = "dashed", alpha = 0.5) +
   scale_fill_brewer(palette = "Greens") +
   labs(
-    title = "Reward Effect on Guess Rate (theta2)",
-    subtitle = "Difference: (Prob High) - (Prob Low) | Negative values: Reward reduced lapses",
-    x = "Difference in Guess Probability (Percentage Points)",
+    title = "Change in guess rate across reward levels",
+    x = "Difference in guess rate (high - low reward)",
     y = ""
   ) +
   theme_minimal(base_size = 14) +
   guides(fill = "none")
 
 ```
+
+## Takeaways
+
+It's good to see that the model estimates the same pattern of value bias across conditions as the simpler (non-mixture) version.
+
+However, there are some concerns here about estimation of kappa (precision) and theta (guess rate):
+
+-   The model continues to struggle with estimating response precision when coherence is high, likely due to identifiability issues. When coherence is high, it also predicts that people are more precise for low-value trials than high-value ones, which is hard to justify empirically.
+
+-   Guess rates look sensible for high-coherence trials, but they are identical regardless of trial reward when coherence is low. This is surprising and a bit concerning: as Christin and I have discussed, it likely reflects the model struggling to distinguish between guesses and low-precision responses to the target.
+
+-   Furthermore, I suspect a relationship between some of the issues for theta and kappa: for instance, when considering high-coherence trials, maybe the model thinks that precision is higher in the low-value condition just because it has filtered out more trials as guesses.
+
+## Next steps
+
+While there are some things which have worked well in this mixture modelling, the data seem quite 'muddy' (i.e., there are a lot of datapoints which are quite hard to classify as genuine responses vs. guesses). This is partially because I added in our usually-excluded 'guessers' on this run, but it will be an issue we need to grapple with irrespective of that.
+
+One really important question here: is this muddiness present *within* every individual distribution, or is it an effect that we see in the dataset as a whole because of *specific participants* who are contaminating the distributions (e.g., consistently guessing or using a strategy different from the instructed one)? As discussed with Christin, I think we will get better results if we rework our modelling approach to classify participants by strategy, then only estimate our parameters of interest for the subset of people who we're confident are doing the task as intended.
